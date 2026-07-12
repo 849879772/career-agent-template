@@ -1,0 +1,54 @@
+# 个人画像与岗位匹配规则。修改本文件不需要改 Python 代码。
+degree: 研究生
+job_type: 校招
+target_cohort: 2027
+
+directions:
+  - C++ 软件开发与软件测试
+  - 大模型与智能体应用
+  - 具身智能、机器人与机械臂
+  - 计算机视觉、VLA、强化学习与模仿学习
+
+skills:
+  - C++
+  - Python
+  - Linux
+  - ROS
+  - PyTorch
+  - 计算机视觉
+
+target_roles:
+  - name: C++ 软件开发
+    keywords: [C++, C/C++, 软件开发, 系统软件, 客户端, 后端, 嵌入式]
+  - name: 软件测试
+    keywords: [软件测试, 测试开发, SDET, QA, 自动化测试]
+  - name: 大模型与智能体
+    keywords: [大模型, LLM, 多模态, RAG, 智能体, Agent, Agentic]
+  - name: 具身智能与机器人
+    keywords: [具身智能, 机器人, Robotics, 机械臂, 运动控制, 运动规划]
+  - name: 视觉与学习算法
+    keywords: [计算机视觉, 机器视觉, 感知, SLAM, 点云, VLA, VLM, 强化学习, 模仿学习]
+
+preferred_cities: []
+
+excluded_title_keywords:
+  - 销售
+  - 客服
+  - 法务
+  - 财务
+  - 人力资源
+  - 行政
+  - 运营
+  - 产品经理
+
+# 五项权重必须合计 100。DeepSeek 会按此标准给出 match_score。
+scoring_weights:
+  role_relevance: 35
+  skill_match: 30
+  responsibility_match: 20
+  education_fit: 10
+  location_preference: 5
+
+score_thresholds:
+  recommend: 80
+  consider: 60

@@ -1,0 +1,41 @@
+name: Sync report (applications)
+
+# 本地录入投递（data/applications.json）push 后，只重新生成报告并部署，
+# 不爬取、不调 DeepSeek（零 token），让手机上几分钟内就能看到最新投递记录。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/applications.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 部署 gh-pages
+
+concurrency:           # 连续多次 push 只保留最后一次部署
+  group: sync-report
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai   # 与 daily_report 一致，报告日期按中国时区
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Regenerate report (no crawl / no DeepSeek)
+        env:
+          CI: "true"
+        run: python view_all.py
+      - name: Deploy report to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true

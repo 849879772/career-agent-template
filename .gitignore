@@ -1,0 +1,38 @@
+# 允许 data/jobs.db 进 git 以便 GitHub Actions 跨 run 保持 DB 状态
+# 只忽略 SQLite 临时文件
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# HTML 报告由 gh-pages 分支接管，主分支不存
+reports/
+
+# 临时调试/探查产物
+temp_test/
+
+# 接公司流水线的中间产物（可由 import/validate 脚本随时重生）
+data/candidates*.json
+data/approved.yaml
+data/validation_report.json
+data/_validate*.log
+
+# 头脑风暴可视化 companion 产物
+.superpowers/
+docs/superpowers/
+
+# Claude Code 本地配置（个人授权/IDE 启动项，不随仓库走）
+.claude/
+
+# 生成的审阅产物 / Excel 临时锁文件
+*.xlsx
+~$*
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets
+.env
+tests/test_*.db
+tests/test_*.json

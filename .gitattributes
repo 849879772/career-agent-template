@@ -1,0 +1,5 @@
+# jobs.db 是运行产物（本地跑爬虫/手动录投递 vs 远端 CI 每日爬取），二进制无法自动合并。
+# 规则：合并冲突时永远保留"我方"(本地)版本，避免每次 push 都要手动解冲突。
+# 仅在 merge（git pull 默认）时生效——本仓库请用 git pull + git push，不要用 rebase。
+# 需配套本地配置：git config merge.ours.driver true
+data/jobs.db merge=ours
