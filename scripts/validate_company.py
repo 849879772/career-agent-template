@@ -15,6 +15,7 @@
 """
 import io
 import json
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -42,7 +43,7 @@ def _is_campus_url(crawler: str, url: str) -> bool:
     if crawler == "moka":
         return "/campus_apply/" in u or "/campus-recruitment/" in u or "campus" in u
     if crawler == "beisen":
-        return "/campus/" in p.path
+        return "/campus/" in p.path or re.match(r"^/\d+/jobs/?$", p.path) is not None
     if crawler == "feishu":
         return "feishu" in p.netloc or "mioffice" in p.netloc  # 路径 token 各租户不同，仅排除明显社招
     return True

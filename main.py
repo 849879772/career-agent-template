@@ -14,6 +14,7 @@ import job_filters
 import notifier
 import reporter
 from profile_config import load_profile
+from scripts import qq_docs_27_autumn_monitor
 from crawlers import CRAWLER_MAP
 
 logging.basicConfig(
@@ -95,6 +96,24 @@ def main():
         sys.exit(1)
     config = load_config(str(config_path))
 
+    # Tencent Docs is a public lead source. Check it before the fixed company
+    # crawl without changing config automatically; new entries still require
+    # crawler validation before they become a daily source.
+    try:
+        source_monitor = qq_docs_27_autumn_monitor.run(config["companies"])
+        qq_docs_27_autumn_monitor.write_report(
+            source_monitor,
+            Path(__file__).parent / "outputs" / "qq_docs_27_autumn_monitor.json",
+        )
+        logger.info(
+            "Tencent Docs 27-autumn precheck: %d rows, covered %d, needs integration %d",
+            len(source_monitor["rows"]),
+            source_monitor["covered"],
+            source_monitor["needs_integration"],
+        )
+    except Exception as exc:
+        logger.warning("Tencent Docs 27-autumn precheck failed: %s", exc)
+
     profile_path = Path(os.environ.get("PROFILE_PATH", Path(__file__).parent / "profile.yaml"))
     try:
         profile = load_profile(profile_path)
@@ -108,13 +127,16 @@ def main():
     conn = db_module.init_db(str(db_path))
     logger.info("数据库已就绪: %s", db_path)
 
-    list_link_crawlers = {"render", "static_html", "hotjob", "bilibili", "jd"}
+    list_link_crawlers = {"render", "static_html", "hotjob", "bilibili"}
     list_link_companies = {
         company["name"] for company in config["companies"]
         if company.get("crawler") in list_link_crawlers
     }
     marked = db_module.mark_listing_links_for_companies(conn, list_link_companies)
+    migrated_jd_links = db_module.migrate_jd_detail_urls(conn)
     purged = db_module.purge_nonformal_campus_jobs(conn)
+    if migrated_jd_links:
+        logger.info("Repaired %d legacy JD detail links", migrated_jd_links)
     if marked:
         logger.info("已标记 %d 条招聘列表链接，报告不再将其显示为岗位详情", marked)
     if purged:

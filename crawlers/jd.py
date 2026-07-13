@@ -104,10 +104,12 @@ class JDCrawler(BaseCrawler):
                 jobs.append(self._make_job(
                     title=title,
                     city=" / ".join(cities)[:80],
-                    jd_url=f"https://campus.jd.com/api/wx/position/index?type={recruit_type}#/details"
-                           f"?type={recruit_type}&id={publish_id}",
+                    # The API endpoint is only used for crawling. The public SPA route
+                    # below opens the concrete job detail page in a browser.
+                    jd_url=f"https://campus.jd.com/#/details?type={recruit_type}&id={publish_id}",
                     jd_raw=jd_raw[: self.JD_RAW_LIMIT],
                     published_at=self._date_ms_to_day(item.get("publishTime")),
+                    link_kind="detail",
                 ))
             if not items:
                 break

@@ -32,8 +32,20 @@ class BeisenRecruitCrawler(BaseCrawler):
     _SKIP_TITLES = {"热招职位", "热门职位", "推荐职位", "热招岗位", "在招职位", "全部职位"}
 
     def _list_url(self) -> str:
-        host = urlparse(self.careers_url).netloc
+        parsed = urlparse(self.careers_url)
+        host = parsed.netloc
+        # Newer Beisen tenants can expose a dedicated campus programme as
+        # ``/<category>/jobs`` (for example iFlytek's 飞凡计划 at ``/5/jobs``).
+        # Preserve that route instead of silently falling back to the default
+        # campus category, which can be empty while the programme is active.
+        match = re.match(r"^/(\d+)/jobs/?$", parsed.path)
+        if match:
+            return f"https://{host}/{match.group(1)}/jobs"
         return f"https://{host}/campus/jobs"
+
+    def _category(self) -> str:
+        match = re.search(r"/(\d+)/jobs/?$", urlparse(self._list_url()).path)
+        return match.group(1) if match else "2"
 
     def _origin(self) -> str:
         p = urlparse(self._list_url())
@@ -43,13 +55,17 @@ class BeisenRecruitCrawler(BaseCrawler):
         return f"{self._origin()}/api/Jobad/GetJobAdPageList"
 
     def _detail_url(self, job_ad_id: str) -> str:
+        path = urlparse(self._list_url()).path
+        prefix = path.rsplit("/jobs", 1)[0]
+        if prefix and prefix != "/campus":
+            return f"{self._origin()}{prefix}/detail?jobAdId={job_ad_id}"
         return f"{self._origin()}/campus/detail?jobAdId={job_ad_id}"
 
     def _api_payload(self, page_index: int) -> dict:
         return {
             "PageIndex": page_index,
             "PageSize": self.PAGE_SIZE,
-            "Category": ["2"],
+            "Category": [self._category()],
             "KeyWords": "",
             "SpecialType": 0,
             "PortalId": "",
@@ -117,8 +133,6 @@ class BeisenRecruitCrawler(BaseCrawler):
             if total is not None and len(jobs) >= int(total):
                 break
             if len(rows) < self.PAGE_SIZE:
-                break
-            if page_index > 50:
                 break
 
         return jobs

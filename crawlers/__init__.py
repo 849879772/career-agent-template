@@ -27,6 +27,7 @@ from .hotjob import HotjobRecruitCrawler
 from .hikvision import HikvisionCrawler
 from .unitree import UnitreeCrawler
 from .xiaomi import XiaomiCrawler
+from .inovance import InovanceRecruitCrawler
 from .placeholders import (
     # 具身智能 / 人形机器人
     ZhiYuanCrawler, GalbotCrawler, RoboteraCrawler, FFTAICrawler, UBTechCrawler, LimxCrawler,
@@ -45,6 +46,7 @@ CRAWLER_MAP = {
     "huawei": HuaweiCrawler,
     "xiaomi": XiaomiCrawler,
     "unitree": UnitreeCrawler,
+    "inovance": InovanceRecruitCrawler,
 
     # 平台级爬虫（一个类服务多家，按 careers_url 解析 slug/子域名/host）
     "moka": MokaRecruitCrawler,

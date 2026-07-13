@@ -11,11 +11,53 @@ from crawlers.beisen import BeisenRecruitCrawler
 from crawlers.bytedance import ByteDanceCrawler
 from crawlers.dji import DJICrawler
 from crawlers.huawei import HuaweiCrawler
+from crawlers.hotjob import HotjobRecruitCrawler
+from crawlers.inovance import InovanceRecruitCrawler
+from crawlers.jd import JDCrawler
 from crawlers.generic_render import GenericRenderCrawler
 from crawlers.static_html import StaticHtmlCrawler
 from crawlers.tencent import TencentCrawler
 from crawlers.unitree import UnitreeCrawler
 from crawlers.xiaomi import XiaomiCrawler
+from crawlers.bilibili import BilibiliCrawler
+from crawlers.oppo import OppoCrawler
+
+
+def test_oppo_detail_url_uses_path_route():
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": {"total": 1, "records": [{
+                "idProjPosition": 1728,
+                "positionName": "software engineer",
+                "workCityName": "Shenzhen",
+            }]}}
+
+    with patch("crawlers.oppo.requests.post", return_value=Resp()):
+        jobs = OppoCrawler("OPPO", "https://careers.oppo.com/university/oppo/recruitment/post").fetch()
+
+    assert jobs[0]["jd_url"] == "https://careers.oppo.com/university/oppo/campus/post/1728"
+
+
+def test_jd_uses_public_spa_detail_route():
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"body": {"totalNumber": 1, "items": [{
+                "positionName": "C++ engineer", "publishId": 7870,
+                "requirementVoList": [{"workCity": "Beijing"}],
+            }]}}
+
+    crawler = JDCrawler("JD", "https://campus.jd.com/")
+    with patch("crawlers.jd.requests.post", return_value=Resp()):
+        jobs = crawler._fetch_type("talent", [1])
+
+    assert jobs[0]["jd_url"] == "https://campus.jd.com/#/details?type=talent&id=7870"
+    assert jobs[0]["link_kind"] == "detail"
 
 
 # ── BaseCrawler ──────────────────────────────────────────────────────────────
@@ -91,6 +133,22 @@ def test_static_html_marks_text_only_jobs_as_listing_links():
         jobs = crawler.fetch()
     assert jobs
     assert all(job["link_kind"] == "list" for job in jobs)
+
+
+def test_hotjob_marks_hash_urls_as_listing_links():
+    crawler = HotjobRecruitCrawler("test", "https://example.hotjob.cn/SU123/pb/account.html")
+    jobs = crawler._parse_pb(
+        '<div class="list-row-item"><div class="list-cell pos-name"><span class="list-cell-span">C++ developer</span></div></div>',
+        "https://example.hotjob.cn/SU123/pb/school.html",
+    )
+    assert jobs[0]["link_kind"] == "list"
+
+
+def test_bilibili_marks_hash_urls_as_listing_links():
+    crawler = BilibiliCrawler("bilibili", BilibiliCrawler.LIST_URL)
+    jobs = []
+    crawler._parse('<div class="item"><h4 class="item-title"><span class="text">algorithm engineer</span></h4></div>', jobs, set())
+    assert jobs[0]["link_kind"] == "list"
 
 
 # ── UnitreeCrawler ───────────────────────────────────────────────────────────
@@ -176,6 +234,7 @@ def test_dji_parses_jobs_from_rendered_html():
     assert "视觉算法工程师" in titles
     for j in jobs:
         assert j["company"] == "大疆"
+        assert j["jd_url"].startswith("https://apply.careers.dji.com/campus-recruitment/dji/143359?locale=zh-CN")
         assert "#/job/" in j["jd_url"]
     cities = {j["city"] for j in jobs}
     assert "广东·深圳市" in cities
@@ -307,6 +366,38 @@ def test_huawei_detail_url_template():
     )
     url = crawler.DETAIL_URL_TEMPLATE.format(ad_id=12345)
     assert url == "https://career.huawei.com/cn/job-details?advertisementId=12345"
+
+
+def test_inovance_uses_current_portal_api_and_detail_url():
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "code": 200,
+                "data": {
+                    "hasMore": False,
+                    "records": [{
+                        "adId": "job-27",
+                        "adJobName": "【27校招】嵌入式软件工程师",
+                        "workLocation": [{"name": "苏州市"}, {"name": "深圳市"}],
+                        "jobDescription": "岗位职责",
+                        "jobRequirement": "2027届，熟悉 C++",
+                        "publishTime": "2026-07-13T17:34:14",
+                    }],
+                },
+            }
+
+    with patch("crawlers.inovance.requests.post", return_value=Resp()) as post:
+        jobs = InovanceRecruitCrawler("汇川技术", "https://recruit.inovance.com/#/campus/jobs").fetch()
+
+    assert len(jobs) == 1
+    assert jobs[0]["title"] == "【27校招】嵌入式软件工程师"
+    assert jobs[0]["city"] == "苏州市 / 深圳市"
+    assert jobs[0]["jd_url"] == "https://recruit.inovance.com/#/jobs/job-27"
+    assert "2027届" in jobs[0]["jd_raw"]
+    assert post.call_args.kwargs["json"]["recruitTypes"] == [1]
 
 
 # ── BeisenRecruitCrawler ─────────────────────────────────────────────────────

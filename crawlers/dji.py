@@ -18,7 +18,7 @@ class DJICrawler(BaseCrawler):
     LIST_URL = "https://apply.careers.dji.com/campus-recruitment/dji/143359"
     LIST_ROUTE = LIST_URL + "?locale=zh-CN#/jobs"
     SCROLL_TIMES = 8
-    MAX_PAGES = 10
+    MAX_PAGES = 200
 
     def fetch(self) -> list[dict]:
         pages = self._render_pages()
@@ -105,7 +105,9 @@ class DJICrawler(BaseCrawler):
             if not title or len(title) < 2:
                 continue
 
-            href = self.LIST_URL + a["href"]
+            # Moka needs the campus project and locale before the hash route.
+            # Omitting them makes DJI redirect the job route to social hiring.
+            href = f"{self.LIST_URL}?locale=zh-CN{a['href']}"
             if href in seen:
                 continue
             seen.add(href)

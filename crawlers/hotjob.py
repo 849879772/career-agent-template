@@ -86,7 +86,9 @@ class HotjobRecruitCrawler(BaseCrawler):
                 continue
             seen.add(key)
             city = self._cell_text(row, "locate", "area", "location", "city", "addr")
-            jobs.append(self._make_job(title=title, city=city[:40], jd_url=f"{list_url}#{key}"))
+            jobs.append(self._make_job(
+                title=title, city=city[:40], jd_url=f"{list_url}#{key}", link_kind="list"
+            ))
         return jobs
 
     def _parse_pb_cards(self, html: str, list_url: str) -> list[dict]:
@@ -116,7 +118,7 @@ class HotjobRecruitCrawler(BaseCrawler):
                     city = part
                     break
             jobs.append(self._make_job(title=title, city=city[:40], jd_url=f"{list_url}#{key}",
-                                       jd_raw=text[: self.JD_RAW_LIMIT]))
+                                       jd_raw=text[: self.JD_RAW_LIMIT], link_kind="list"))
         return jobs
 
     def _fetch_new_pb_api(self) -> list[dict]:
@@ -170,6 +172,7 @@ class HotjobRecruitCrawler(BaseCrawler):
                     jd_url=jd_url,
                     jd_raw=jd_raw[: self.JD_RAW_LIMIT],
                     published_at=(item.get("publishDate") or "")[:10],
+                    link_kind="list",
                 ))
             if not page_form.get("pageData"):
                 break
@@ -196,7 +199,7 @@ class HotjobRecruitCrawler(BaseCrawler):
             seen.add(key)
             m = re.search(r"([一-龥]{2,}[市省](?:、[一-龥]{2,}[市省])*)", it.get_text(" ", strip=True))
             jobs.append(self._make_job(title=title, city=(m.group(1) if m else "")[:40],
-                                       jd_url=f"{list_url}#{key}"))
+                                       jd_url=f"{list_url}#{key}", link_kind="list"))
         return jobs
 
     def _parse_foxconn(self, html: str, list_url: str) -> list[dict]:
@@ -219,7 +222,7 @@ class HotjobRecruitCrawler(BaseCrawler):
             seen.add(key)
             city = cells[3] if len(cells) > 3 else ""
             jobs.append(self._make_job(title=title, city=city[:40], jd_url=f"{list_url}#{key}",
-                                       jd_raw=" | ".join(cells)[: self.JD_RAW_LIMIT]))
+                                       jd_raw=" | ".join(cells)[: self.JD_RAW_LIMIT], link_kind="list"))
         return jobs
 
     def fetch(self) -> list[dict]:

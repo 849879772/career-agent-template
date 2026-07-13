@@ -88,6 +88,67 @@ def test_insert_job_new():
     conn.close()
 
 
+def test_normalize_listing_link_kinds_marks_legacy_list_urls():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "test", "title": "role", "city": "", "job_type": "campus",
+        "jd_url": "https://example.zhiye.com/campus/jobs#123", "jd_raw": "",
+        "published_at": "", "source": "test", "link_kind": "detail",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    assert db.normalize_listing_link_kinds(conn) == 1
+    assert conn.execute("SELECT link_kind FROM jobs WHERE id = ?", (job_id,)).fetchone()[0] == "list"
+    conn.close()
+
+
+def test_migrate_oppo_detail_urls_uses_path_parameter():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "OPPO", "title": "role", "city": "", "job_type": "campus",
+        "jd_url": "https://careers.oppo.com/university/oppo/campus/post?id=1728", "jd_raw": "",
+        "published_at": "", "source": "test", "link_kind": "detail",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    assert db.migrate_oppo_detail_urls(conn) == 1
+    url = conn.execute("SELECT jd_url FROM jobs WHERE id = ?", (job_id,)).fetchone()[0]
+    assert url.endswith("/campus/post/1728")
+    conn.close()
+
+
+def test_migrate_jd_detail_urls_uses_public_spa_route():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "JD", "title": "role", "city": "", "job_type": "campus",
+        "jd_url": "https://campus.jd.com/api/wx/position/index?type=talent#/details?type=talent&id=7870",
+        "jd_raw": "", "published_at": "", "source": "test", "link_kind": "list",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    assert db.migrate_jd_detail_urls(conn) == 1
+    row = conn.execute("SELECT jd_url, link_kind FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    assert row["jd_url"] == "https://campus.jd.com/#/details?type=talent&id=7870"
+    assert row["link_kind"] == "detail"
+    conn.close()
+
+
+def test_get_active_jobs_hides_list_rows_when_company_has_details():
+    conn = db.init_db(TEST_DB)
+    detail = {
+        "company": "test", "title": "detail", "city": "", "job_type": "campus",
+        "jd_url": "https://example.com/campus/detail?jobAdId=1", "jd_raw": "",
+        "published_at": "", "source": "test", "link_kind": "detail",
+    }
+    listing = {
+        "company": "test", "title": "legacy listing", "city": "", "job_type": "campus",
+        "jd_url": "https://example.com/campus/jobs#1", "jd_raw": "",
+        "published_at": "", "source": "test", "link_kind": "list",
+    }
+    db.upsert_job(conn, detail)
+    db.upsert_job(conn, listing)
+    assert [job["title"] for job in db.get_active_jobs(conn)] == ["detail"]
+    assert [item["job"]["title"] for item in db.get_all_jobs_with_analysis(conn)] == ["detail"]
+    conn.close()
+
+
 def test_purge_nonformal_campus_jobs_removes_old_project_label_rows():
     conn = db.init_db(TEST_DB)
     formal = {"company": "甲", "title": "正式岗", "city": "北京", "job_type": "校招",

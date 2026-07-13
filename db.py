@@ -1,5 +1,6 @@
 import json
 import hashlib
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -49,6 +50,81 @@ STAGE_TO_COLUMN = {
 }
 _VALID_STAGES = {k for k, _ in APPLICATION_STAGES}
 _DEFAULT_STAGE = "applied"
+
+
+# These routes expose a recruitment list.  A fragment appended to them is only
+# a crawler-side identifier and cannot be opened as an individual job page.
+_LISTING_URL_MARKERS = (
+    "/campus/jobs#",
+    "/campus/positions#",
+    "/pb/school.html#",
+    "/mc/position/campus#",
+    "/position#",
+    "/positions#",
+    "/job-campus",
+    "/officialportal/#/campuslist",
+    "/personal/personal_applyjob.aspx",
+    "/external/apply.aspx",
+    "young.yingjiesheng.com/xyzlogin",
+    "login.dangdang.com",
+    "/invoiceapply/",
+)
+
+
+def is_listing_url(jd_url: str) -> bool:
+    """Return whether a URL is a list route rather than a job-detail route."""
+    return any(marker in (jd_url or "").casefold() for marker in _LISTING_URL_MARKERS)
+
+
+def normalize_listing_link_kinds(conn: sqlite3.Connection) -> int:
+    """Correct historical rows whose list URLs were stored as job details."""
+    rows = conn.execute("SELECT id, jd_url FROM jobs WHERE link_kind <> 'list'").fetchall()
+    ids = [(row["id"],) for row in rows if is_listing_url(row["jd_url"])]
+    if not ids:
+        return 0
+    conn.executemany("UPDATE jobs SET link_kind = 'list' WHERE id = ?", ids)
+    conn.commit()
+    return len(ids)
+
+
+def migrate_oppo_detail_urls(conn: sqlite3.Connection) -> int:
+    """Repair the former OPPO query-string links to the real SPA detail route."""
+    cursor = conn.execute(
+        """UPDATE jobs
+           SET jd_url = REPLACE(
+               jd_url,
+               'https://careers.oppo.com/university/oppo/campus/post?id=',
+               'https://careers.oppo.com/university/oppo/campus/post/'
+           )
+           WHERE jd_url LIKE 'https://careers.oppo.com/university/oppo/campus/post?id=%'"""
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
+def migrate_jd_detail_urls(conn: sqlite3.Connection) -> int:
+    """Repair legacy JD API URLs into browser-openable SPA detail routes."""
+    rows = conn.execute(
+        "SELECT id, jd_url FROM jobs WHERE jd_url LIKE 'https://campus.jd.com/api/wx/position/index?type=%#/details?type=%&id=%'"
+    ).fetchall()
+    updates = []
+    for row in rows:
+        match = re.search(r"#/details\?type=([^&]+)&id=([^&]+)", row["jd_url"])
+        if not match:
+            continue
+        recruit_type, publish_id = match.groups()
+        updates.append((
+            f"https://campus.jd.com/#/details?type={recruit_type}&id={publish_id}",
+            row["id"],
+        ))
+    if not updates:
+        return 0
+    conn.executemany(
+        "UPDATE jobs SET jd_url = ?, link_kind = 'detail' WHERE id = ?",
+        updates,
+    )
+    conn.commit()
+    return len(updates)
 
 
 def init_db(db_path=None) -> sqlite3.Connection:
@@ -105,6 +181,7 @@ def init_db(db_path=None) -> sqlite3.Connection:
     if "link_kind" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN link_kind TEXT DEFAULT 'detail'")
         conn.execute("UPDATE jobs SET link_kind = 'list' WHERE jd_url GLOB '*#[0-9]*' OR jd_url LIKE '%/campus/jobs#%'")
+    normalize_listing_link_kinds(conn)
     conn.commit()
     return conn
 
@@ -298,7 +375,18 @@ def get_active_jobs(conn: sqlite3.Connection) -> list[dict]:
     """
     cutoff = (date.today() - timedelta(days=ACTIVE_WINDOW_DAYS - 1)).isoformat()
     rows = conn.execute(
-        "SELECT * FROM jobs WHERE last_seen_at >= ?", (cutoff,)
+        """SELECT * FROM jobs AS job
+           WHERE job.last_seen_at >= ?
+             AND (
+                 job.link_kind <> 'list'
+                 OR NOT EXISTS (
+                     SELECT 1 FROM jobs AS detail
+                     WHERE detail.company = job.company
+                       AND detail.last_seen_at >= ?
+                       AND detail.link_kind <> 'list'
+                 )
+             )""",
+        (cutoff, cutoff),
     ).fetchall()
     return [dict(row) for row in rows]
 
@@ -400,7 +488,16 @@ def get_active_report_data(conn: sqlite3.Connection) -> dict:
 
 def get_all_jobs_with_analysis(conn: sqlite3.Connection) -> list[dict]:
     """所有 DB 岗位 + 各自分析（已 join），用于飞书 '全部追踪' 推送。"""
-    rows = conn.execute("SELECT * FROM jobs ORDER BY id").fetchall()
+    rows = conn.execute(
+        """SELECT * FROM jobs AS job
+           WHERE job.link_kind <> 'list'
+              OR NOT EXISTS (
+                  SELECT 1 FROM jobs AS detail
+                  WHERE detail.company = job.company
+                    AND detail.link_kind <> 'list'
+              )
+           ORDER BY job.id"""
+    ).fetchall()
     return _join_analysis(conn, [dict(r) for r in rows])["items"]
 
 

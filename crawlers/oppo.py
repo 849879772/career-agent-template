@@ -63,7 +63,7 @@ class OppoCrawler(BaseCrawler):
                 jobs.append(self._make_job(
                     title=title,
                     city=(item.get("workCityName") or "")[:80],
-                    jd_url=f"https://careers.oppo.com/university/oppo/campus/post?id={job_id}",
+                    jd_url=f"https://careers.oppo.com/university/oppo/campus/post/{job_id}",
                     jd_raw=jd_raw[: self.JD_RAW_LIMIT],
                     published_at=item.get("releaseTime") or "",
                 ))

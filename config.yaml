@@ -197,9 +197,6 @@ companies:
 - name: 柏楚电子
   careers_url: https://fscut.zhiye.com/campus/jobs
   crawler: beisen
-- name: 汇川
-  careers_url: https://inovance.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 中控
   careers_url: https://app.mokahr.com/campus-recruitment/supcon/148189
   crawler: moka
@@ -330,8 +327,8 @@ companies:
   careers_url: https://wondersharecampus.zhiye.com/campus/jobs
   crawler: beisen
 - name: 汇川技术
-  careers_url: https://inovance.zhiye.com/campus/jobs
-  crawler: beisen
+  careers_url: https://recruit.inovance.com/#/campus/jobs
+  crawler: inovance
 - name: 虾皮信息
   careers_url: https://app.mokahr.com/campus-recruitment/shopee/2962
   crawler: moka
@@ -1622,6 +1619,21 @@ companies:
 - name: 诺瓦星云
   careers_url: https://novastar.zhiye.com/campus/jobs
   crawler: beisen
+- name: 微步在线
+  careers_url: https://app.mokahr.com/m/campus_apply/threatbook/39679?recommendCode=DSUK2sNv#/jobs
+  crawler: moka
+- name: 思特威
+  careers_url: https://app.mokahr.com/campus_apply/smartsenstech1/56088?recommendCode=DS2NEFMs#/jobs
+  crawler: moka
+- name: MiniMax
+  careers_url: https://vrfi1sk8a0.jobs.feishu.cn/s/kGKwaJ_fg7g
+  crawler: feishu
+- name: 同花顺
+  careers_url: https://campus.10jqka.com.cn/job/list?type=school
+  crawler: render
+- name: 学而思
+  careers_url: https://app.mokahr.com/campus_apply/tal/148080?recommendCode=DS8pWxXy#/jobs
+  crawler: moka
 deepseek:
   model: deepseek-v4-flash
   max_tokens: 3000

@@ -100,6 +100,6 @@ class BilibiliCrawler(BaseCrawler):
             m = _CITY_RE.findall(ctext)
             city = "、".join(dict.fromkeys(m))[:40]
             jobs.append(self._make_job(title=title, city=city,
-                                       jd_url=f"{self.LIST_URL}#{key}"))
+                                       jd_url=f"{self.LIST_URL}#{key}", link_kind="list"))
             new += 1
         return new
