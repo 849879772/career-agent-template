@@ -9,7 +9,7 @@ class XiaomiCrawler(FeishuRecruitCrawler):
 
     LIST_URL = "https://xiaomi.jobs.f.mioffice.cn/campus"
     HOST = "https://xiaomi.jobs.f.mioffice.cn"
-    MAX_PAGES = 10
+    MAX_PAGES = 200
     GOTO_WAIT_UNTIL = "networkidle"
     GOTO_TIMEOUT_MS = 60000
     JD_RAW_LIMIT = 500

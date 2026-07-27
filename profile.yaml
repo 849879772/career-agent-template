@@ -17,6 +17,18 @@ skills:
   - PyTorch
   - 计算机视觉
 
+# 只有这里列出的真实经历会被 V4-Pro 当作直接项目证据。
+# 示例：使用 C++、ROS 和深度相机完成机器人感知项目。
+project_evidence: []
+
+# 感兴趣但尚未形成完整项目证据的方向不会被当作已掌握能力。
+learning_targets:
+  - 大模型应用、RAG 与智能体工作流
+  - 具身智能、VLA、强化学习与模仿学习
+
+unverified_skills: []
+secondary_directions: []
+
 target_roles:
   - name: C++ 软件开发
     keywords: [C++, C/C++, 软件开发, 系统软件, 客户端, 后端, 嵌入式]
@@ -41,13 +53,13 @@ excluded_title_keywords:
   - 运营
   - 产品经理
 
-# 五项权重必须合计 100。DeepSeek 会按此标准给出 match_score。
-scoring_weights:
-  role_relevance: 35
-  skill_match: 30
-  responsibility_match: 20
-  education_fit: 10
-  location_preference: 5
+# 五项上限必须合计 100。程序会按证据等级和核心缺口进一步封顶。
+score_component_limits:
+  core_direction: 25
+  required_skills: 25
+  project_evidence: 25
+  engineering_stack: 15
+  basic_criteria: 10
 
 score_thresholds:
   recommend: 80

@@ -44,6 +44,7 @@ When adding or verifying company crawlers, always update `outputs/company_integr
 
 - Use the local Codex skill `recruitment-crawler-integration` for company onboarding, campus URL validation, failed-candidate handling, and crawler status maintenance.
 - Follow the canonical workflow in `docs/crawling_process.md`. If you discover a better crawler strategy, Firecrawl/Crawl4AI usage pattern, validation rule, or integration shortcut, update that document in the same turn and tell the user what changed.
+- Determine the recruitment cohort before JD hydration or AI work. Only jobs with persisted official evidence `cohort=2027` and `cohort_status=confirmed` may enter JD completion, Flash screening, V4-Pro scoring, or Feishu recommendations. Keep previous and unconfirmed cohorts visible in their dedicated report pages without model calls.
 - Add verified crawler entries to `config.yaml` only after a real crawler run returns job rows from the correct campus recruitment page.
 - Record successful additions under `Newly Added And Connected`.
 - Move aliases or duplicates already covered by config into the covered/removed state instead of leaving them in the pending list.

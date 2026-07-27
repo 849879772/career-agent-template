@@ -1,11 +1,13 @@
 import os
 import sqlite3
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import db
+import analyzer
 
 TEST_DB = "tests/test_jobs.db"
 TEST_APPS = "tests/test_applications.json"
@@ -28,7 +30,42 @@ def test_init_db_creates_tables():
     assert "jobs" in names
     assert "job_analysis" in names
     assert "job_screening_cache" in names
-    assert "link_kind" in {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+    job_columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+    assert "link_kind" in job_columns
+    assert "screening_tier" in job_columns
+    assert "link_status" in job_columns
+    assert "link_checked_at" in job_columns
+    conn.close()
+
+
+def test_init_db_migrates_51job_application_url_to_detail_page():
+    conn = db.init_db(TEST_DB)
+    conn.execute(
+        """INSERT INTO jobs
+           (company, title, city, job_type, jd_url, jd_raw, published_at, source,
+            crawled_at, last_seen_at, link_kind)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            "Example",
+            "Algorithm Engineer",
+            "",
+            "campus",
+            "https://xyz.51job.com/external/apply.aspx?jobid=140887255&ctmid=6293090",
+            "",
+            "",
+            "Example",
+            "2026-07-25",
+            "2026-07-25",
+            "list",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    conn = db.init_db(TEST_DB)
+    row = conn.execute("SELECT jd_url, link_kind FROM jobs").fetchone()
+    assert row["jd_url"] == "https://jobs.51job.com/all/140887255.html"
+    assert row["link_kind"] == "detail"
     conn.close()
 
 
@@ -53,6 +90,86 @@ def test_save_screening_decisions_writes_a_batch():
     db.save_screening_decisions(conn, [(jobs[0], True), (jobs[1], False)])
     assert db.get_screening_decision(conn, jobs[0]) is True
     assert db.get_screening_decision(conn, jobs[1]) is False
+    conn.close()
+
+
+def test_purge_screening_tier_c_jobs_removes_analysis():
+    conn = db.init_db(TEST_DB)
+    kept = {
+        "company": "测试公司",
+        "title": "C++开发工程师",
+        "city": "上海",
+        "job_type": "校招",
+        "jd_url": "https://example.com/jobs/kept",
+        "jd_raw": "负责 C++ 软件开发与测试。",
+        "published_at": "",
+        "source": "测试公司",
+    }
+    dropped = {
+        **kept,
+        "title": "Java开发工程师",
+        "jd_url": "https://example.com/jobs/dropped",
+    }
+    _, kept_id = db.upsert_job(conn, {**kept, "screening_tier": "A"})
+    _, dropped_id = db.upsert_job(conn, {**dropped, "screening_tier": "C"})
+    db.save_analysis(
+        conn,
+        dropped_id,
+        {
+            "match_score": 20,
+            "advantages": [],
+            "gaps": [],
+            "summary": "方向不符",
+            "recommendation": "不推荐",
+        },
+    )
+
+    assert db.purge_screening_tier_c_jobs(conn) == 1
+    assert conn.execute("SELECT 1 FROM jobs WHERE id = ?", (kept_id,)).fetchone()
+    assert conn.execute("SELECT 1 FROM jobs WHERE id = ?", (dropped_id,)).fetchone() is None
+    assert (
+        conn.execute(
+            "SELECT 1 FROM job_analysis WHERE job_id = ?", (dropped_id,)
+        ).fetchone()
+        is None
+    )
+    conn.close()
+
+
+def test_purge_screening_tier_b_analyses_keeps_job():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "测试公司",
+        "title": "软件开发工程师",
+        "city": "上海",
+        "job_type": "校招",
+        "jd_url": "https://example.com/jobs/b",
+        "jd_raw": "负责业务软件开发。",
+        "published_at": "",
+        "source": "测试公司",
+        "screening_tier": "B",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    db.save_analysis(
+        conn,
+        job_id,
+        {
+            "match_score": 50,
+            "advantages": [],
+            "gaps": [],
+            "summary": "证据不足",
+            "recommendation": "不推荐",
+        },
+    )
+
+    assert db.purge_screening_tier_b_analyses(conn) == 1
+    assert conn.execute("SELECT 1 FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    assert (
+        conn.execute(
+            "SELECT 1 FROM job_analysis WHERE job_id = ?", (job_id,)
+        ).fetchone()
+        is None
+    )
     conn.close()
 
 
@@ -101,6 +218,23 @@ def test_normalize_listing_link_kinds_marks_legacy_list_urls():
     conn.close()
 
 
+def test_get_job_with_analysis_returns_one_joined_item():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "示例公司", "title": "C++ 工程师", "city": "深圳",
+        "job_type": "校招", "jd_url": "https://example.com/job/one",
+        "jd_raw": "负责软件开发", "published_at": "", "source": "示例公司",
+    }
+    _, job_id = db.upsert_job(conn, job)
+
+    item = db.get_job_with_analysis(conn, job_id)
+
+    assert item["job"]["title"] == "C++ 工程师"
+    assert item["analysis"] is None
+    assert db.get_job_with_analysis(conn, job_id + 999) is None
+    conn.close()
+
+
 def test_migrate_oppo_detail_urls_uses_path_parameter():
     conn = db.init_db(TEST_DB)
     job = {
@@ -130,7 +264,7 @@ def test_migrate_jd_detail_urls_uses_public_spa_route():
     conn.close()
 
 
-def test_get_active_jobs_hides_list_rows_when_company_has_details():
+def test_get_active_jobs_keeps_distinct_list_rows_when_company_has_details():
     conn = db.init_db(TEST_DB)
     detail = {
         "company": "test", "title": "detail", "city": "", "job_type": "campus",
@@ -144,8 +278,33 @@ def test_get_active_jobs_hides_list_rows_when_company_has_details():
     }
     db.upsert_job(conn, detail)
     db.upsert_job(conn, listing)
-    assert [job["title"] for job in db.get_active_jobs(conn)] == ["detail"]
-    assert [item["job"]["title"] for item in db.get_all_jobs_with_analysis(conn)] == ["detail"]
+    assert {job["title"] for job in db.get_active_jobs(conn)} == {
+        "detail",
+        "legacy listing",
+    }
+    assert {
+        item["job"]["title"] for item in db.get_all_jobs_with_analysis(conn)
+    } == {"detail", "legacy listing"}
+    conn.close()
+
+
+def test_migrate_bilibili_detail_links_promotes_real_position_routes():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "bilibili", "title": "多模态智能体工程师", "city": "上海",
+        "job_type": "校招", "jd_url": "https://jobs.bilibili.com/campus/positions/29370",
+        "jd_raw": "职位描述：负责多模态智能体系统开发。任职要求：熟悉 LLM Agent。" * 4,
+        "published_at": "", "source": "bilibili", "link_kind": "list",
+        "jd_status": "list_only",
+    }
+    _, job_id = db.upsert_job(conn, job)
+
+    assert db.migrate_bilibili_detail_links(conn) == 1
+    row = conn.execute(
+        "SELECT link_kind, jd_status FROM jobs WHERE id = ?", (job_id,)
+    ).fetchone()
+    assert row["link_kind"] == "detail"
+    assert row["jd_status"] == "complete"
     conn.close()
 
 
@@ -160,6 +319,82 @@ def test_purge_nonformal_campus_jobs_removes_old_project_label_rows():
     assert db.purge_nonformal_campus_jobs(conn) == 1
     assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 1
     conn.close()
+
+
+def test_tiered_screening_cache_invalidates_when_jd_changes():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "甲", "title": "软件工程师", "city": "杭州",
+        "jd_url": "u1", "jd_raw": "负责C++客户端开发",
+    }
+    db.save_screening_tiers(conn, [(job, "A")])
+    assert db.get_screening_tier(conn, job) == "A"
+    assert db.get_screening_tier(conn, {**job, "jd_raw": "负责Java后端开发"}) is None
+    assert db.get_screening_tier(conn, job, "future-version") is None
+    conn.close()
+
+
+def test_purge_incomplete_jd_analyses_keeps_job_but_removes_score():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "甲", "title": "AI应用工程师", "city": "深圳",
+        "job_type": "校招", "jd_url": "https://example.com/job/empty-shell",
+        "jd_raw": "岗位职责\n岗位要求\n工作地点\n申请\n校园招聘\n社会招聘\n关于我们",
+        "published_at": "", "source": "甲",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    db.save_analysis(conn, job_id, {
+        "match_score": 90, "advantages": [], "gaps": [],
+        "summary": "旧评分", "recommendation": "推荐",
+    })
+
+    assert db.purge_incomplete_jd_analyses(conn) == 1
+    assert conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 1
+    assert not db.has_analysis(conn, job_id)
+    conn.close()
+
+
+def test_purge_direction_out_jobs_removes_job_and_analysis():
+    conn = db.init_db(TEST_DB)
+    technical = {"company": "甲", "title": "C++软件开发工程师", "city": "北京", "job_type": "校招",
+                 "jd_url": "https://example.com/technical", "jd_raw": "", "published_at": "", "source": "甲"}
+    non_target = {"company": "乙", "title": "产品运营经理", "city": "上海", "job_type": "校招",
+                  "jd_url": "https://example.com/operations", "jd_raw": "", "published_at": "", "source": "乙"}
+    _, technical_id = db.upsert_job(conn, technical)
+    _, non_target_id = db.upsert_job(conn, non_target)
+    db.save_analysis(conn, non_target_id, {
+        "match_score": 10, "advantages": [], "gaps": [], "summary": "方向不匹配", "recommendation": "不推荐",
+    })
+
+    try:
+        assert db.purge_direction_out_jobs(conn) == 1
+        remaining_ids = [row["id"] for row in conn.execute("SELECT id FROM jobs")]
+        assert remaining_ids == [technical_id]
+        assert not db.has_analysis(conn, non_target_id)
+    finally:
+        conn.close()
+
+
+def test_purge_jobs_by_ids_removes_only_verified_offline_rows():
+    conn = db.init_db(TEST_DB)
+    first = {
+        "company": "甲", "title": "C++开发工程师", "city": "北京",
+        "job_type": "校招", "jd_url": "https://example.com/1",
+        "jd_raw": "", "published_at": "", "source": "甲",
+    }
+    second = {**first, "title": "测试开发工程师", "jd_url": "https://example.com/2"}
+    _, first_id = db.upsert_job(conn, first)
+    _, second_id = db.upsert_job(conn, second)
+    db.save_analysis(conn, first_id, {
+        "match_score": 80, "advantages": [], "gaps": [],
+        "summary": "已分析", "recommendation": "推荐",
+    })
+
+    assert db.purge_jobs_by_ids(conn, [first_id]) == 1
+    assert conn.execute("SELECT id FROM jobs").fetchone()[0] == second_id
+    assert not db.has_analysis(conn, first_id)
+    conn.close()
+
 
 def test_get_latest_crawl_date():
     conn = db.init_db(TEST_DB)
@@ -239,6 +474,38 @@ def test_save_and_has_analysis():
     }
     db.save_analysis(conn, job_id, analysis)
     assert db.has_analysis(conn, job_id) is True
+    conn.close()
+
+
+def test_analysis_is_current_requires_matching_metadata():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "宇树", "title": "算法工程师", "city": "杭州", "job_type": "校招",
+        "jd_url": "https://example.com/job/analysis-meta", "jd_raw": "完整岗位描述" * 30,
+        "published_at": "", "source": "宇树",
+    }
+    _, job_id = db.insert_job(conn, job)
+    db.save_analysis(conn, job_id, {
+        "match_score": 75,
+        "advantages": [],
+        "gaps": [],
+        "summary": "已分析",
+        "recommendation": "考虑",
+        "analysis_status": "complete",
+        "analysis_version": "v2",
+        "jd_fingerprint": "jd-hash",
+        "profile_fingerprint": "profile-hash",
+        "model": "deepseek-v4-pro",
+    })
+    assert db.analysis_is_current(
+        conn, job_id, "v2", "jd-hash", "profile-hash", "deepseek-v4-pro"
+    )
+    assert not db.analysis_is_current(
+        conn, job_id, "v2", "changed-jd", "profile-hash", "deepseek-v4-pro"
+    )
+    assert not db.analysis_is_current(
+        conn, job_id, "v3", "jd-hash", "profile-hash", "deepseek-v4-pro"
+    )
     conn.close()
 
 def test_upsert_refreshes_last_seen_at():
@@ -345,6 +612,8 @@ def test_upsert_distinct_city_not_merged():
 
 def test_get_disappeared_jobs():
     conn = db.init_db(TEST_DB)
+    today = date.today()
+    yesterday = (today - timedelta(days=1)).isoformat()
     # 老岗位：上次见到 = 昨天
     old_job = {
         "company": "宇树", "title": "已下线岗位", "city": "杭州", "job_type": "校招",
@@ -352,8 +621,8 @@ def test_get_disappeared_jobs():
         "source": "宇树",
     }
     db.upsert_job(conn, old_job)
-    conn.execute("UPDATE jobs SET last_seen_at = '2026-05-13' WHERE jd_url = ?",
-                 (old_job["jd_url"],))
+    conn.execute("UPDATE jobs SET last_seen_at = ? WHERE jd_url = ?",
+                 (yesterday, old_job["jd_url"]))
     conn.commit()
 
     # 今天该公司爬虫成功（successful_companies 含"宇树"）但没拿到这个岗位
@@ -364,6 +633,224 @@ def test_get_disappeared_jobs():
     # 该公司爬虫失败 → 不应返回
     disappeared_fail = db.get_disappeared_jobs(conn, set())
     assert disappeared_fail == []
+    conn.close()
+
+
+def test_upsert_job_preserves_richer_existing_jd():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "甲", "title": "算法工程师", "city": "深圳", "job_type": "校招",
+        "jd_url": "https://example.com/job/rich", "jd_raw": "岗位职责：负责算法开发。任职要求：熟悉 Python 和深度学习。" * 5,
+        "published_at": "", "source": "甲",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    db.upsert_job(conn, {**job, "jd_raw": "算法工程师 发布于 2026-07-22"})
+    stored = conn.execute("SELECT jd_raw FROM jobs WHERE id = ?", (job_id,)).fetchone()[0]
+    assert stored == job["jd_raw"]
+    conn.close()
+
+
+def test_update_job_jd_does_not_downgrade_complete_text_to_summary():
+    conn = db.init_db(TEST_DB)
+    full_jd = "岗位职责：负责算法开发。任职要求：熟悉 Python 和深度学习。" * 8
+    job = {
+        "company": "甲", "title": "算法工程师", "city": "深圳", "job_type": "校招",
+        "jd_url": "https://example.com/job/full", "jd_raw": full_jd,
+        "published_at": "", "source": "甲",
+    }
+    _, job_id = db.upsert_job(conn, job)
+
+    db.update_job_jd(conn, job_id, "算法工程师 发布于 2026-07-25")
+
+    stored = conn.execute(
+        "SELECT jd_raw FROM jobs WHERE id = ?", (job_id,)
+    ).fetchone()[0]
+    assert stored == full_jd
+    conn.close()
+
+
+def test_upsert_job_upgrades_unique_legacy_list_row_without_duplication():
+    conn = db.init_db(TEST_DB)
+    legacy = {
+        "company": "示例公司", "title": "软件工程师", "city": "",
+        "job_type": "校招", "jd_url": "https://example.com/campus/jobs",
+        "jd_raw": "软件工程师 校园招聘", "published_at": "",
+        "source": "示例公司", "link_kind": "list",
+    }
+    inserted, job_id = db.upsert_job(conn, legacy)
+    assert inserted
+
+    detail = {
+        "company": "示例公司", "title": "软件工程师", "city": "上海",
+        "job_type": "校招 正式", "jd_url": "https://example.com/campus/jobs/123",
+        "jd_raw": (
+            "岗位职责\n负责软件开发与测试。\n"
+            "任职要求\n熟悉 C++、Linux 和网络编程。"
+        ) * 3,
+        "published_at": "2026-07-25", "source": "示例公司",
+        "link_kind": "detail",
+    }
+    inserted, updated_id = db.upsert_job(conn, detail)
+
+    assert not inserted
+    assert updated_id == job_id
+    rows = conn.execute(
+        "SELECT city, jd_url, jd_raw, link_kind FROM jobs"
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0]["city"] == "上海"
+    assert rows[0]["jd_url"].endswith("/123")
+    assert rows[0]["link_kind"] == "detail"
+    assert "任职要求" in rows[0]["jd_raw"]
+    conn.close()
+
+
+def test_mark_job_jd_status_records_check_time():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "示例公司", "title": "机器人算法工程师", "city": "深圳",
+        "job_type": "校招", "jd_url": "https://example.com/job/empty",
+        "jd_raw": "", "published_at": "", "source": "示例公司",
+        "link_kind": "detail",
+    }
+    _, job_id = db.upsert_job(conn, job)
+
+    db.mark_job_jd_status(conn, job_id, "official_unavailable")
+
+    row = conn.execute(
+        "SELECT jd_status, jd_checked_at FROM jobs WHERE id = ?", (job_id,)
+    ).fetchone()
+    assert row["jd_status"] == "official_unavailable"
+    assert row["jd_checked_at"]
+    conn.close()
+
+
+def test_update_job_link_statuses_records_verdict_and_check_time():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "Example",
+        "title": "Robot Engineer",
+        "city": "Shenzhen",
+        "job_type": "campus",
+        "jd_url": "https://example.com/job/1",
+        "jd_raw": "",
+        "published_at": "",
+        "source": "Example",
+    }
+    _, job_id = db.upsert_job(conn, job)
+
+    updated = db.update_job_link_statuses(
+        conn,
+        [(job_id, "reachable_detail")],
+    )
+
+    row = conn.execute(
+        "SELECT link_status, link_checked_at FROM jobs WHERE id = ?",
+        (job_id,),
+    ).fetchone()
+    assert updated == 1
+    assert row["link_status"] == "reachable_detail"
+    assert row["link_checked_at"]
+    conn.close()
+
+
+def test_upsert_job_sets_complete_and_list_only_jd_statuses():
+    conn = db.init_db(TEST_DB)
+    complete = {
+        "company": "Example",
+        "title": "C++ Engineer",
+        "city": "Shanghai",
+        "job_type": "campus",
+        "jd_url": "https://example.com/job/complete",
+        "jd_raw": (
+            "Responsibilities: build production software and automated tests. "
+            "Requirements: strong C++, Linux, data structures, and teamwork. "
+        ) * 4,
+        "published_at": "",
+        "source": "Example",
+        "link_kind": "detail",
+    }
+    listing = {
+        **complete,
+        "title": "Algorithm Engineer",
+        "jd_url": "https://example.com/campus/jobs",
+        "jd_raw": "",
+        "link_kind": "list",
+    }
+
+    _, complete_id = db.upsert_job(conn, complete)
+    _, listing_id = db.upsert_job(conn, listing)
+
+    statuses = dict(
+        conn.execute(
+            "SELECT id, jd_status FROM jobs WHERE id IN (?, ?)",
+            (complete_id, listing_id),
+        ).fetchall()
+    )
+    assert statuses[complete_id] == "complete"
+    assert statuses[listing_id] == "list_only"
+    conn.close()
+
+
+def test_upsert_job_preserves_verified_unavailable_status():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "Example",
+        "title": "Robot Engineer",
+        "city": "Shenzhen",
+        "job_type": "campus",
+        "jd_url": "https://example.com/job/unavailable",
+        "jd_raw": "",
+        "published_at": "",
+        "source": "Example",
+        "link_kind": "detail",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    db.mark_job_jd_status(conn, job_id, "official_unavailable")
+
+    db.upsert_job(conn, job)
+
+    status = conn.execute(
+        "SELECT jd_status FROM jobs WHERE id = ?", (job_id,)
+    ).fetchone()[0]
+    assert status == "official_unavailable"
+    conn.close()
+
+
+def test_get_disappeared_jobs_does_not_repeat_historical_batches():
+    conn = db.init_db(TEST_DB)
+    stale_job = {
+        "company": "宇树", "title": "历史岗位", "city": "杭州", "job_type": "校招",
+        "jd_url": "https://example.com/job/stale", "jd_raw": "", "published_at": "",
+        "source": "宇树",
+    }
+    db.upsert_job(conn, stale_job)
+    conn.execute(
+        "UPDATE jobs SET last_seen_at = ? WHERE jd_url = ?",
+        ((date.today() - timedelta(days=5)).isoformat(), stale_job["jd_url"]),
+    )
+    conn.commit()
+
+    assert db.get_disappeared_jobs(conn, {"宇树"}) == []
+    conn.close()
+
+
+def test_get_disappeared_jobs_supports_explicit_scan_date():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "宇树", "title": "昨日岗位", "city": "杭州", "job_type": "校招",
+        "jd_url": "https://example.com/job/yesterday", "jd_raw": "", "published_at": "",
+        "source": "宇树",
+    }
+    db.upsert_job(conn, job)
+    conn.execute(
+        "UPDATE jobs SET last_seen_at = '2026-07-18' WHERE jd_url = ?",
+        (job["jd_url"],),
+    )
+    conn.commit()
+
+    rows = db.get_disappeared_jobs(conn, {"宇树"}, scan_date="2026-07-19")
+    assert [row["title"] for row in rows] == ["昨日岗位"]
     conn.close()
 
 
@@ -412,6 +899,24 @@ def test_get_all_jobs_with_analysis():
     assert by_title["已分析岗"]["analysis"]["match_score"] == 75
     assert by_title["已分析岗"]["analysis"]["advantages"] == ["ROS"]
     assert by_title["未分析岗"]["analysis"] is None
+    conn.close()
+
+
+def test_get_all_jobs_with_analysis_excludes_stale_history():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "测试公司", "title": "过期岗位", "city": "北京", "job_type": "校招",
+        "jd_url": "https://example.com/all/stale", "jd_raw": "", "published_at": "",
+        "source": "测试公司",
+    }
+    db.upsert_job(conn, job)
+    conn.execute(
+        "UPDATE jobs SET last_seen_at = '2020-01-01' WHERE jd_url = ?",
+        (job["jd_url"],),
+    )
+    conn.commit()
+
+    assert db.get_all_jobs_with_analysis(conn) == []
     conn.close()
 
 
@@ -560,4 +1065,20 @@ def test_application_events_add_and_delete():
     event_id = app["events"][0]["id"]
     assert db.delete_application_event(conn, app_id, event_id) is True
     assert db.get_applications(conn)[0]["events"] == []
+    conn.close()
+
+
+def test_purge_b_tier_analyses_preserves_locally_upgraded_a_job(monkeypatch):
+    conn = db.init_db(TEST_DB)
+    job_id = _insert_job(conn)
+    conn.execute("UPDATE jobs SET screening_tier = 'B' WHERE id = ?", (job_id,))
+    conn.execute(
+        "INSERT INTO job_analysis (job_id, match_score) VALUES (?, ?)",
+        (job_id, 80),
+    )
+    conn.commit()
+    monkeypatch.setattr(analyzer, "analysis_screening_tier", lambda _job: "A")
+
+    assert db.purge_screening_tier_b_analyses(conn) == 0
+    assert db.has_analysis(conn, job_id)
     conn.close()

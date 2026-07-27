@@ -15,7 +15,7 @@ class NetEaseCrawler(BaseCrawler):
     API = "https://campus.163.com/api/campuspc/position/getJobList"
     PAGE_SIZE = 50
     MAX_PAGES = 5
-    JD_RAW_LIMIT = 1000
+    JD_RAW_LIMIT = 12000
 
     def _project_id(self) -> str:
         parsed = urlparse(self.careers_url)
@@ -56,14 +56,14 @@ class NetEaseCrawler(BaseCrawler):
                 if not title or job_id in seen:
                     continue
                 seen.add(job_id)
-                jd_raw = "\n".join(
-                    x for x in [
-                        item.get("positionTypeName") or "",
-                        item.get("firstBuName") or "",
-                        item.get("positionDescription") or "",
-                        item.get("positionRequirement") or "",
-                    ] if x
-                )
+                duties = str(item.get("positionDescription") or "").strip()
+                requirements = str(item.get("positionRequirement") or "").strip()
+                jd_raw = "\n".join(x for x in [
+                    item.get("positionTypeName") or "",
+                    item.get("firstBuName") or "",
+                    "岗位职责", duties,
+                    "任职要求", requirements,
+                ] if x)
                 jobs.append(self._make_job(
                     title=title,
                     city=(item.get("workPlaceName") or "")[:80],

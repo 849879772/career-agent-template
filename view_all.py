@@ -16,22 +16,7 @@ import reporter
 
 def fetch_all(conn) -> dict:
     """返回 DB 中所有岗位 + 各自的分析（若有）。"""
-    rows = conn.execute(
-        "SELECT * FROM jobs ORDER BY crawled_at DESC, id DESC"
-    ).fetchall()
-    items = []
-    for row in rows:
-        job = dict(row)
-        analysis_row = conn.execute(
-            "SELECT * FROM job_analysis WHERE job_id = ?", (job["id"],)
-        ).fetchone()
-        if analysis_row:
-            analysis = dict(analysis_row)
-            analysis["advantages"] = json.loads(analysis["advantages"] or "[]")
-            analysis["gaps"] = json.loads(analysis["gaps"] or "[]")
-        else:
-            analysis = None
-        items.append({"job": job, "analysis": analysis})
+    items = db_module.get_all_jobs_with_analysis(conn)
     return {"date": "累计全部", "items": items,
             "applications": db_module.get_applications(conn)}
 

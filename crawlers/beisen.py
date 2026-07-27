@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class BeisenRecruitCrawler(BaseCrawler):
     EXTRA_WAIT_MS = 6000
     SCROLL_TIMES = 8
-    JD_RAW_LIMIT = 300
+    JD_RAW_LIMIT = 12000
     PAGE_SIZE = 100
     # 北森列表页的栏目标题也带 STJobTitle 类，需剔除，避免写成假岗位
     _SKIP_TITLES = {"热招职位", "热门职位", "推荐职位", "热招岗位", "在招职位", "全部职位"}
@@ -116,12 +116,14 @@ class BeisenRecruitCrawler(BaseCrawler):
                 seen.add(job_id)
                 locs = row.get("LocNames") or []
                 city = "、".join(str(x) for x in locs if x)[:80]
-                jd_raw = "\n".join(
-                    part for part in [
-                        row.get("Duty") or "",
-                        row.get("Require") or "",
-                    ] if part
-                )[: self.JD_RAW_LIMIT]
+                duty = str(row.get("Duty") or "").strip()
+                requirement = str(row.get("Require") or "").strip()
+                jd_parts = []
+                if duty:
+                    jd_parts.extend(["岗位职责", duty])
+                if requirement:
+                    jd_parts.extend(["任职要求", requirement])
+                jd_raw = "\n".join(jd_parts)[: self.JD_RAW_LIMIT]
                 jobs.append(self._make_job(
                     title=title,
                     city=city,

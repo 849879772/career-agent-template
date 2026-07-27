@@ -27,16 +27,16 @@ jobs:
     timeout-minutes: 330
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-chromium-v1
@@ -51,7 +51,6 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
-          REPORT_BASE_URL: ${{ vars.REPORT_BASE_URL }}
           CI: "true"
         run: python main.py
 
@@ -59,11 +58,13 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/jobs.db
+          # 腾讯文档自动接入只在真实抓到正式校招岗位后才会修改配置和状态文档。
+          git add data/jobs.db config.yaml outputs/company_integration_status.md
           if git diff --staged --quiet; then
             echo "No DB changes to commit"
           else
-            git commit -m "chore: update jobs.db $(date -u +%Y-%m-%d) [skip ci]"
+            # TZ 已设为 Asia/Shanghai；不要使用 -u，否则凌晨任务会写成前一天。
+            git commit -m "chore: update crawler state $(date +%Y-%m-%d) [skip ci]"
             # 先 rebase 拉取远端新提交，避免与手动触发/其他 push 并发时 non-fast-forward 失败
             if ! git pull --rebase --autostash origin main; then
               # jobs.db 是 SQLite 二进制文件。工作流间的唯一冲突可保留本次
@@ -82,7 +83,7 @@ jobs:
           fi
 
       - name: Deploy report to gh-pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./reports

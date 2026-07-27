@@ -7,6 +7,12 @@ on:
     branches: [main]
     paths:
       - "data/applications.json"
+      - "data/jobs.db"
+      - "reporter.py"
+      - "view_all.py"
+      - "job_filters.py"
+      - "db.py"
+      - ".github/workflows/sync_report.yml"
   workflow_dispatch:
 
 permissions:
@@ -22,8 +28,8 @@ jobs:
     env:
       TZ: Asia/Shanghai   # 与 daily_report 一致，报告日期按中国时区
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Install deps
@@ -33,7 +39,7 @@ jobs:
           CI: "true"
         run: python view_all.py
       - name: Deploy report to gh-pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./reports

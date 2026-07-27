@@ -7,10 +7,11 @@
 ## 主要功能
 
 - 多平台企业招聘爬虫，支持飞书、Moka、北森及企业专用招聘站。
-- 正式校招过滤：实习和社招在入库前排除，往届岗位单独展示。
-- 两阶段 AI 分析：先粗筛岗位标题，再对相关岗位计算匹配度。
-- 增量运行：已有岗位复用分析结果，只分析新增岗位，节省 Token。
-- 静态报告：岗位排行、今日新增、公司排行、往届校招和投递看板。
+- 正式校招过滤：实习、提前批和社招在入库前排除。
+- 届别证据分流：只有官方证据确认的 27 届岗位补全 JD 并执行 AI 分析；往届和待确认岗位单独展示。
+- 混合 AI 分析：本地规则与 Flash 完成 A/B/C 分级，仅 A 档使用 V4-Pro 评分。
+- 增量运行：JD、画像、模型和评分版本均未变化时复用结果，避免重复消耗 Token。
+- 静态报告：27 届岗位、今日新增、分届公司排行、往届/待确认岗位和投递看板。
 - GitHub Actions 定时运行，报告发布到 `gh-pages` 分支。
 - 可接入 Cloudflare Pages 和飞书机器人。
 
@@ -28,7 +29,7 @@
 3. 建议选择 **Private**，岗位库和投递记录会保存在仓库中。
 4. 点击 **Create repository**。
 
-模板内的 `data/jobs.db` 是空数据库，`data/applications.json` 也是空列表，不包含模板作者的岗位或投递数据。
+模板内的 `data/jobs.db` 可能包含工作流最近抓到的公开岗位，但不包含模板作者的匹配分析；`data/applications.json` 保持为空，不带个人投递记录。首次运行会按你的 `profile.yaml` 生成自己的分析结果。
 
 ## 二、填写个人画像和评分标准
 
@@ -41,6 +42,12 @@ target_cohort: 2027
 
 skills: [C++, Python, Linux, ROS, PyTorch]
 
+project_evidence:
+  - 使用 C++、ROS 和深度相机完成机器人感知项目
+
+learning_targets: [大模型应用, RAG, 智能体]
+unverified_skills: []
+
 target_roles:
   - name: C++ 软件开发
     keywords: [C++, C/C++, 软件开发, 系统软件, 后端]
@@ -49,12 +56,12 @@ target_roles:
 
 preferred_cities: [北京, 上海, 深圳, 杭州]
 
-scoring_weights:
-  role_relevance: 35
-  skill_match: 30
-  responsibility_match: 20
-  education_fit: 10
-  location_preference: 5
+score_component_limits:
+  core_direction: 25
+  required_skills: 25
+  project_evidence: 25
+  engineering_stack: 15
+  basic_criteria: 10
 
 score_thresholds:
   recommend: 80
@@ -63,9 +70,11 @@ score_thresholds:
 
 规则说明：
 
-- `target_roles` 同时控制标题粗筛和详细分析，增加新方向时在这里添加。
+- `target_roles` 控制标题粗筛；增加新方向时在这里添加关键词。
+- `project_evidence` 只填写确实做过的项目，这是 V4-Pro 判定直接匹配的核心依据。
+- `learning_targets` 和 `unverified_skills` 只表示学习意向，不会被当作已掌握能力。
 - `excluded_title_keywords` 命中的岗位会优先排除。
-- `scoring_weights` 必须合计为 `100`，否则程序会在启动时明确报错。
+- `score_component_limits` 必须包含五个评分项并合计为 `100`。
 - `score_thresholds` 决定“推荐、考虑、不推荐”的分界线。
 - `preferred_cities` 留空表示地点不限。
 
@@ -98,7 +107,7 @@ score_thresholds:
 3. 左侧选择 **Daily Recruitment Report**。
 4. 点击 **Run workflow → Run workflow**。
 
-首次运行需要安装浏览器并分析初始岗位，可能持续几十分钟到数小时。后续运行会复用岗位筛选和匹配结果，Token 消耗通常只来自新增岗位。
+首次运行需要安装浏览器并分析初始岗位，可能持续几十分钟到数小时。后续运行只分析新增岗位，或 JD、画像、模型、评分版本发生变化的岗位。
 
 成功后可以看到：
 
@@ -191,7 +200,7 @@ python webapp.py
 - 不要从不同设备同时修改 `jobs.db`，SQLite 二进制文件无法像文本一样合并。
 - 不要强制推送 `main`，否则可能覆盖云端自动更新的数据库。
 - 公开仓库会公开岗位分析和投递信息，个人部署建议使用私有仓库。
-- DeepSeek 费用取决于新增岗位数；重复岗位不会重复进行详细分析。
+- DeepSeek 费用主要取决于确认 27 届且进入 A 档的新增/变更岗位；B 档、往届和待确认岗位不调用 V4-Pro。
 
 ## 修改公司名单
 

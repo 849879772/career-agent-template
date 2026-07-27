@@ -14,7 +14,7 @@ config 用法：crawler: render + careers_url(职位列表页 URL)。无需子�
 import logging
 import re
 from collections import defaultdict
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -24,7 +24,19 @@ logger = logging.getLogger(__name__)
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-_CITY_RE = re.compile(r"[\u4e00-\u9fa5]{2,}(?:市|省|区|县)?")
+_CITY_NAMES = (
+    "北京", "上海", "天津", "重庆", "香港", "澳门", "深圳", "广州", "杭州",
+    "南京", "苏州", "无锡", "常州", "南通", "徐州", "扬州", "镇江", "昆山",
+    "宁波", "温州", "嘉兴", "绍兴", "金华", "台州", "湖州", "武汉", "宜昌",
+    "襄阳", "成都", "绵阳", "西安", "合肥", "芜湖", "长沙", "株洲", "郑州",
+    "洛阳", "济南", "青岛", "烟台", "潍坊", "威海", "厦门", "福州", "泉州",
+    "漳州", "珠海", "东莞", "佛山", "惠州", "中山", "大连", "沈阳", "长春",
+    "哈尔滨", "石家庄", "太原", "南昌", "南宁", "海口", "贵阳", "昆明",
+    "兰州", "乌鲁木齐", "呼和浩特", "全国", "海外", "国外",
+)
+_CITY_RE = re.compile(
+    rf"({'|'.join(sorted(_CITY_NAMES, key=len, reverse=True))})(?:市)?"
+)
 _JOB_KW = re.compile(
     r"工程师|研发|开发|算法|架构|设计师|实习生|管培|培训生|专员|主管|"
     r"产品经理|运营|测试|分析师|顾问|储备|工艺|科学家|研究员|策划|助理|应届|博士后|"
@@ -33,7 +45,7 @@ _JOB_KW = re.compile(
 )
 # 明显非职位的噪声(筛选/导航/页脚/说明文案)
 _NOISE = re.compile(
-    r"筛选|清除|职位类别|工作地点|大职能|仅查看|热门|须知|查看|更多|登录|注册|"
+    r"筛选|清除|职位类别|工作地点|大职能|仅查看|热门|须知|查看|更多|登录|注册|开发者论坛|开发者平台|开发者区域|"
     r"计划是|面向|推出|全球|高校|在校生|清空|展开|收起|首页|关于|联系|"
     r"招聘流程|投递方式|个人中心|加入我们|了解更多|立即申请|点击|"
     r"校招流程|校招岗位|校招FAQ|FAQ|招聘公告|招聘简章|招聘动态|校招行程|快捷通道|"
@@ -59,10 +71,15 @@ _CONTEXT_NOISE = re.compile(
     r"序号|单位名称|单位所在地|招聘人数|应聘方式|海报|双选会|招聘会",
     re.I,
 )
+_NON_JOB_HOSTS = {
+    "youtube.com", "www.youtube.com", "linkedin.com", "www.linkedin.com",
+    "bilibili.com", "www.bilibili.com", "weibo.com", "www.weibo.com",
+}
 
 
 class GenericRenderCrawler(BaseCrawler):
     MAX_PAGES = 25
+    NAVIGATION_ATTEMPTS = 2
     JD_RAW_LIMIT = 200
     MIN_LEN, MAX_LEN = 4, 30
     MIN_HITS = 3  # 主选择器至少命中这么多职位才认为有效
@@ -75,11 +92,46 @@ class GenericRenderCrawler(BaseCrawler):
         text = re.sub(r"\s*(立即投递|申请职位|投递简历)\s*$", "", text).strip()
         if "个岗位" in text or text.endswith("类"):
             return ""
+        if re.fullmatch(r"developers?", text, re.I):
+            return ""
         if not (self.MIN_LEN <= len(text) <= self.MAX_LEN):
             return ""
         if _BAD_TITLE_RE.search(text) or _NOISE.search(text) or not _JOB_KW.search(text):
             return ""
         return text
+
+    @staticmethod
+    def _extract_city(text: str) -> str:
+        matches = [match.group(1) for match in _CITY_RE.finditer(text or "")]
+        return "、".join(dict.fromkeys(matches))[:40]
+
+    @classmethod
+    def _extract_job_city(cls, title: str, context: str) -> str:
+        title_city = cls._extract_city(title)
+        if title_city:
+            return title_city
+        location = re.search(r"工作地点.{0,40}", context or "")
+        if location:
+            cities = cls._extract_city(location.group(0))
+            if cities:
+                return cities.split("、", 1)[0]
+        cities = cls._extract_city((context or "")[:120])
+        return cities.split("、", 1)[0] if cities else ""
+
+    @staticmethod
+    def _card_context(el) -> str:
+        """Use the nearest bounded card instead of climbing into the full list."""
+        context = el.get_text(" ", strip=True)
+        parent = el.parent
+        for _ in range(4):
+            if not parent:
+                break
+            candidate = parent.get_text(" ", strip=True)
+            if len(candidate) > 600:
+                break
+            context = candidate
+            parent = parent.parent
+        return context
 
     def fetch(self) -> list[dict]:
         try:
@@ -100,10 +152,7 @@ class GenericRenderCrawler(BaseCrawler):
                 ctx = browser.new_context(user_agent=_UA, viewport={"width": 1366, "height": 768},
                                           locale="zh-CN", ignore_https_errors=True)
                 page = ctx.new_page()
-                try:
-                    page.goto(self._list_url(), wait_until="networkidle", timeout=45000)
-                except PWTimeout:
-                    logger.warning("[%s] goto 超时，仍尝试解析", self.company_name)
+                self._goto_with_retry(page, PWTimeout)
                 page.wait_for_timeout(2500)
 
                 self._click_campus_entry(page)
@@ -162,6 +211,28 @@ class GenericRenderCrawler(BaseCrawler):
                     self.company_name, len(jobs), selector_sig)
         return jobs
 
+    def _goto_with_retry(self, page, timeout_error) -> bool:
+        """Navigate with one retry for transient timeout/empty-response errors."""
+        for attempt in range(1, self.NAVIGATION_ATTEMPTS + 1):
+            try:
+                page.goto(self._list_url(), wait_until="networkidle", timeout=45000)
+                return True
+            except timeout_error as exc:
+                reason = f"超时: {exc}"
+            except Exception as exc:  # Playwright network errors are not timeouts.
+                reason = str(exc)
+            if attempt < self.NAVIGATION_ATTEMPTS:
+                logger.warning(
+                    "[%s] 页面打开失败，准备重试 %d/%d: %s",
+                    self.company_name, attempt, self.NAVIGATION_ATTEMPTS - 1, reason,
+                )
+                page.wait_for_timeout(1500)
+        logger.warning(
+            "[%s] 页面打开连续失败，仍尝试解析当前页面: %s",
+            self.company_name, reason,
+        )
+        return False
+
     def _parse_line_jobs(self, html: str) -> list[dict]:
         """Fallback for simple static pages that list jobs as lines like `职位：软件工程师`."""
         soup = BeautifulSoup(html, "html.parser")
@@ -202,6 +273,8 @@ class GenericRenderCrawler(BaseCrawler):
                     continue
                 resolved = urljoin(self._list_url(), href)
                 if resolved == self._list_url() or re.search(r"#\d+$", resolved):
+                    continue
+                if urlsplit(resolved).netloc.casefold() in _NON_JOB_HOSTS:
                     continue
                 return resolved, "detail"
         return self._list_url(), "list"
@@ -244,14 +317,10 @@ class GenericRenderCrawler(BaseCrawler):
             if key in seen:
                 continue
             seen.add(key)
-            anc = el
-            for _ in range(3):
-                anc = anc.parent if anc and anc.parent else anc
-            ctext = anc.get_text(" ", strip=True) if anc else ""
+            ctext = self._card_context(el)
             if _CONTEXT_NOISE.search(ctext):
                 continue
-            m = _CITY_RE.findall(ctext)
-            city = "、".join(dict.fromkeys(m))[:40]
+            city = self._extract_job_city(title, ctext)
             jd_url, link_kind = self._job_link(el)
             jobs.append(self._make_job(
                 title=title, city=city, jd_url=jd_url, link_kind=link_kind,

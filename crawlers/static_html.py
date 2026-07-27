@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -11,7 +11,7 @@ _JOB_KW = re.compile(
     re.I,
 )
 _NOISE = re.compile(
-    r"首页|关于|联系|招聘|社会招聘|校园招聘|加入我们|岗位职责|任职要求|"
+    r"首页|关于|联系|招聘|社会招聘|校园招聘|加入我们|岗位职责|任职要求|开发者论坛|开发者平台|"
     r"职位描述|工作地点|发布时间|申请职位|投递|邮箱|电话|地址|Copyright|"
     r"有限责任公司|股份有限公司|集团有限公司|招贤纳士|简称|公司简介|"
     r"^负责|熟悉|掌握|经验|使用|配合|了解|支持工作|开发流程|文档|技能|"
@@ -30,6 +30,19 @@ _SECTION_TEXT = re.compile(
     r"[\w\u4e00-\u9fff]+&[\w\u4e00-\u9fff]+类|[\w\u4e00-\u9fff]+类|[\w\u4e00-\u9fff]+部)$"
 )
 _SOCIAL_TITLE_TEXT = re.compile(r"高级工程师|资深|专家|主管|经理|总监")
+_NON_JOB_HREF = re.compile(
+    r"(?:^|/)(?:about|bbs|developer|forum|news|product|research|solution|technology)(?:/|\.|$)",
+    re.I,
+)
+_NON_CAMPUS_CONTEXT = re.compile(r"社会招聘|社招|日常实习|应届实习|实习生")
+_NON_JOB_HOSTS = {
+    "youtube.com", "www.youtube.com", "linkedin.com", "www.linkedin.com",
+    "bilibili.com", "www.bilibili.com", "weibo.com", "www.weibo.com",
+}
+
+
+def _is_non_job_url(url: str) -> bool:
+    return urlsplit(url).netloc.casefold() in _NON_JOB_HOSTS
 
 
 class StaticHtmlCrawler(BaseCrawler):
@@ -82,14 +95,42 @@ class StaticHtmlCrawler(BaseCrawler):
             if not title or title in seen or not href or href == "#" or href.lower().startswith("javascript:"):
                 continue
             jd_url = urljoin(self.careers_url, href)
-            if jd_url == self.careers_url:
+            if (
+                jd_url == self.careers_url
+                or _NON_JOB_HREF.search(urlsplit(jd_url).path)
+                or _is_non_job_url(jd_url)
+            ):
                 continue
             seen.add(title)
             jobs.append(self._make_job(title=title, jd_url=jd_url, link_kind="detail"))
-        for text in soup.stripped_strings:
-            title = self._clean_title(text)
+        for text_node in soup.find_all(string=True):
+            parent = text_node.parent
+            title = self._clean_title(str(text_node))
             if not title or title in seen:
                 continue
+            anchor = None
+            if parent:
+                anchor = parent if parent.name == "a" else parent.find_parent("a")
+            if anchor:
+                href = (anchor.get("href") or "").strip()
+                context = anchor.get_text(" ", strip=True)
+                if _NON_CAMPUS_CONTEXT.search(context):
+                    continue
+                if not href or href == "#" or href.lower().startswith("javascript:"):
+                    jd_url = self.careers_url
+                    link_kind = "list"
+                else:
+                    jd_url = urljoin(self.careers_url, href)
+                    if (
+                        jd_url == self.careers_url
+                        or _NON_JOB_HREF.search(urlsplit(jd_url).path)
+                        or _is_non_job_url(jd_url)
+                    ):
+                        continue
+                    link_kind = "detail"
+            else:
+                jd_url = self.careers_url
+                link_kind = "list"
             seen.add(title)
-            jobs.append(self._make_job(title=title, jd_url=self.careers_url, link_kind="list"))
+            jobs.append(self._make_job(title=title, jd_url=jd_url, link_kind=link_kind))
         return jobs

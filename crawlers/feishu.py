@@ -17,7 +17,7 @@
 """
 import logging
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
 
@@ -29,6 +29,12 @@ _BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+_CAMPAIGN_LABEL_RE = re.compile(
+    r"(?<!\d)(?:20\d{2}|[12]\d)\s*(?:届|年)?\s*"
+    r"(?:春招|秋招|校招|校园招聘|校园招募|应届生招聘|毕业生招聘|"
+    r"暑期实习|日常实习|实习生招聘)",
+    re.I,
 )
 
 
@@ -46,12 +52,23 @@ class FeishuRecruitCrawler(BaseCrawler):
 
     LIST_URL = ""
     HOST = ""
-    MAX_PAGES = 10
+    # Stop on the disabled next button or repeated page content. This is a
+    # circuit breaker only, not a normal collection limit.
+    MAX_PAGES = 500
     GOTO_WAIT_UNTIL = "networkidle"
     GOTO_TIMEOUT_MS = 60000
     JD_RAW_LIMIT = 500
 
+    @staticmethod
+    def _next_button(page):
+        locator = page.locator(".atsx-pagination-next")
+        if locator.count() == 0:
+            return None
+        return locator.first
+
     def fetch(self) -> list[dict]:
+        self.pagination_complete = False
+        self.pagination_termination_reason = "not_started"
         try:
             from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
         except ImportError:
@@ -83,42 +100,84 @@ class FeishuRecruitCrawler(BaseCrawler):
                 try:
                     page.goto(self.LIST_URL, wait_until=self.GOTO_WAIT_UNTIL,
                               timeout=self.GOTO_TIMEOUT_MS)
-                    page.wait_for_selector(".positionItem-title-text", timeout=30000)
+                    page.wait_for_selector(
+                        ".positionItem-title-text, .listNoData-text",
+                        timeout=30000,
+                    )
                 except PWTimeout as e:
                     logger.warning("[%s] 加载列表超时: %s", self.company_name, e)
 
                 for page_num in range(1, self.MAX_PAGES + 1):
                     page.wait_for_timeout(1500)
-                    soup = BeautifulSoup(page.content(), "html.parser")
-                    anchors = [
-                        a for a in soup.find_all("a", href=True)
-                        if "/position/" in a["href"] and "/detail" in a["href"]
+                    page_jobs = self._parse_page_jobs(page)
+                    new_jobs = [
+                        job for job in page_jobs
+                        if job["jd_url"] not in seen_urls
                     ]
-                    page_jobs = self._parse_anchors(anchors)
+                    if not new_jobs and page_num > 1:
+                        # Client-side pagination can take longer than the
+                        # nominal delay. Re-read before declaring a stall.
+                        for _ in range(3):
+                            page.wait_for_timeout(2500)
+                            page_jobs = self._parse_page_jobs(page)
+                            new_jobs = [
+                                job for job in page_jobs
+                                if job["jd_url"] not in seen_urls
+                            ]
+                            if new_jobs:
+                                break
 
-                    new_count = 0
-                    for job in page_jobs:
-                        if job["jd_url"] in seen_urls:
-                            continue
+                    for job in new_jobs:
                         seen_urls.add(job["jd_url"])
                         all_jobs.append(job)
-                        new_count += 1
+                    new_count = len(new_jobs)
 
                     logger.info("[%s] 第 %d 页解析 %d 个岗位（新增 %d）",
                                 self.company_name, page_num, len(page_jobs), new_count)
-                    if new_count == 0 and page_num > 1:
+                    next_btn = self._next_button(page)
+                    if next_btn is None:
+                        self.pagination_complete = True
+                        self.pagination_termination_reason = (
+                            "empty_result_no_pagination"
+                            if not all_jobs
+                            else "single_page_no_pagination"
+                        )
+                        logger.info("[%s] 页面无分页控件，已完成当前列表", self.company_name)
                         break
 
-                    next_btn = page.locator(".atsx-pagination-next").first
+                    if new_count == 0 and page_num > 1:
+                        cls = next_btn.get_attribute("class") or ""
+                        if "disabled" in cls:
+                            self.pagination_complete = True
+                            self.pagination_termination_reason = "terminal_button_disabled"
+                        else:
+                            self.pagination_termination_reason = "page_stalled"
+                            logger.error(
+                                "[%s] 第 %d 页内容持续未刷新且下一页仍可用，本次结果不完整",
+                                self.company_name,
+                                page_num,
+                            )
+                        break
+
                     try:
                         cls = next_btn.get_attribute("class") or ""
                         if "disabled" in cls:
                             logger.info("[%s] 已到末页", self.company_name)
+                            self.pagination_complete = True
+                            self.pagination_termination_reason = "terminal_button_disabled"
                             break
                         next_btn.click()
                     except Exception as e:
+                        self.pagination_termination_reason = "next_page_error"
                         logger.warning("[%s] 翻页失败: %s", self.company_name, e)
                         break
+                else:
+                    self.pagination_termination_reason = "safety_limit"
+                    logger.error(
+                        "[%s] 达到 %d 页安全上限，尚未确认末页；本次结果可能不完整",
+                        self.company_name,
+                        self.MAX_PAGES,
+                    )
 
                 context.close()
                 browser.close()
@@ -127,6 +186,14 @@ class FeishuRecruitCrawler(BaseCrawler):
 
         logger.info("[%s] 共抓到 %d 个岗位", self.company_name, len(all_jobs))
         return all_jobs
+
+    def _parse_page_jobs(self, page) -> list[dict]:
+        soup = BeautifulSoup(page.content(), "html.parser")
+        anchors = [
+            anchor for anchor in soup.find_all("a", href=True)
+            if "/position/" in anchor["href"] and "/detail" in anchor["href"]
+        ]
+        return self._parse_anchors(anchors)
 
     def _parse_anchors(self, anchors) -> list[dict]:
         jobs = []
@@ -146,11 +213,23 @@ class FeishuRecruitCrawler(BaseCrawler):
             href = a["href"]
             if not href.startswith("http"):
                 href = self.HOST + href
+            parts = urlsplit(href)
+            href = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
             jd_raw = a.get_text(separator=" ", strip=True)[: self.JD_RAW_LIMIT]
+            campaign_text = " ".join(dict.fromkeys(
+                match.group(0).strip()
+                for match in _CAMPAIGN_LABEL_RE.finditer(jd_raw)
+            ))
 
             jobs.append(
-                self._make_job(title=title, city=city, jd_url=href, jd_raw=jd_raw)
+                self._make_job(
+                    title=title,
+                    city=city,
+                    jd_url=href,
+                    jd_raw=jd_raw,
+                    campaign_text=campaign_text,
+                )
             )
         return jobs
 

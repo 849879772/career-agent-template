@@ -14,7 +14,7 @@ class GbitsCrawler(BaseCrawler):
     API = "https://joinserver.g-bits.com:8666/humanResource/recruitmentExtranet/ExtrannetCampusPost/queryRecuitPost"
     PAGE_SIZE = 50
     MAX_PAGES = 10
-    JD_RAW_LIMIT = 1000
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -55,6 +55,7 @@ class GbitsCrawler(BaseCrawler):
                         item.get("recruitProjectName") or "",
                         item.get("gameProjectName") or "",
                         item.get("postType") or "",
+                        "职位描述",
                         item.get("description") or "",
                     ] if x
                 )

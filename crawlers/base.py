@@ -1,6 +1,8 @@
 import logging
 import random
+import time
 from typing import Optional
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -15,7 +17,22 @@ _USER_AGENTS = [
 ]
 
 
+def normalize_job_detail_url(url: str, link_kind: str) -> tuple[str, str]:
+    """Convert known application intermediaries into browser job-detail URLs."""
+    parsed = urlparse(url or "")
+    if (
+        parsed.netloc.casefold() == "xyz.51job.com"
+        and parsed.path.casefold() == "/external/apply.aspx"
+    ):
+        job_ids = parse_qs(parsed.query).get("jobid") or []
+        if job_ids and str(job_ids[0]).isdigit():
+            return f"https://jobs.51job.com/all/{job_ids[0]}.html", "detail"
+    return url, link_kind
+
+
 class BaseCrawler:
+    REQUEST_ATTEMPTS = 3
+
     def __init__(self, company_name: str, careers_url: str):
         self.company_name = company_name
         self.careers_url = careers_url
@@ -27,13 +44,24 @@ class BaseCrawler:
         headers = dict(kwargs.pop("headers", {}))
         headers.setdefault("User-Agent", random.choice(_USER_AGENTS))
         headers.setdefault("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-        try:
-            resp = requests.get(url, headers=headers, timeout=15, **kwargs)
-            resp.raise_for_status()
-            return resp
-        except requests.RequestException as e:
-            logger.error("[%s] 请求失败 %s: %s", self.company_name, url, e)
-            return None
+        timeout = kwargs.pop("timeout", 15)
+        for attempt in range(1, self.REQUEST_ATTEMPTS + 1):
+            try:
+                resp = requests.get(url, headers=headers, timeout=timeout, **kwargs)
+                resp.raise_for_status()
+                return resp
+            except requests.RequestException as e:
+                if attempt == self.REQUEST_ATTEMPTS:
+                    logger.error(
+                        "[%s] 请求失败 %s（已重试 %d 次）: %s",
+                        self.company_name, url, self.REQUEST_ATTEMPTS - 1, e,
+                    )
+                    return None
+                logger.warning(
+                    "[%s] 请求失败，准备重试 %d/%d: %s",
+                    self.company_name, attempt, self.REQUEST_ATTEMPTS - 1, e,
+                )
+                time.sleep(0.5 * attempt)
 
     def _make_job(
         self,
@@ -44,15 +72,21 @@ class BaseCrawler:
         jd_raw: str = "",
         published_at: str = "",
         link_kind: str = "detail",
+        campaign_text: str = "",
     ) -> dict:
+        jd_url, link_kind = normalize_job_detail_url(
+            jd_url or self.careers_url,
+            link_kind,
+        )
         return {
             "company": self.company_name,
             "title": title,
             "city": city,
             "job_type": job_type,
-            "jd_url": jd_url or self.careers_url,
+            "jd_url": jd_url,
             "jd_raw": jd_raw,
             "published_at": published_at,
             "link_kind": link_kind,
             "source": self.company_name,
+            "campaign_text": campaign_text,
         }

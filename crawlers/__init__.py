@@ -5,6 +5,7 @@ from .meituan import MeituanCrawler
 from .baidu import BaiduCrawler
 from .kuaishou import KuaishouCrawler
 from .generic_render import GenericRenderCrawler
+from .greenvalley import GreenvalleyCrawler
 from .static_html import StaticHtmlCrawler
 from .bilibili import BilibiliCrawler
 from .feishu import GenericFeishuCrawler
@@ -28,6 +29,11 @@ from .hikvision import HikvisionCrawler
 from .unitree import UnitreeCrawler
 from .xiaomi import XiaomiCrawler
 from .inovance import InovanceRecruitCrawler
+from .huayan import HuayanCrawler
+from .pdd import PDDCrawler
+from .iguopin import IGuopinCrawler
+from .itek import ItekCrawler
+from .xtimes import XTimesCrawler
 from .placeholders import (
     # 具身智能 / 人形机器人
     ZhiYuanCrawler, GalbotCrawler, RoboteraCrawler, FFTAICrawler, UBTechCrawler, LimxCrawler,
@@ -47,6 +53,7 @@ CRAWLER_MAP = {
     "xiaomi": XiaomiCrawler,
     "unitree": UnitreeCrawler,
     "inovance": InovanceRecruitCrawler,
+    "huayan": HuayanCrawler,
 
     # 平台级爬虫（一个类服务多家，按 careers_url 解析 slug/子域名/host）
     "moka": MokaRecruitCrawler,
@@ -95,7 +102,12 @@ CRAWLER_MAP = {
     "baidu": BaiduCrawler,
     "kuaishou": KuaishouCrawler,
     "bilibili": BilibiliCrawler,
+    "pdd": PDDCrawler,
+    "iguopin": IGuopinCrawler,
+    "itek": ItekCrawler,
+    "xtimes": XTimesCrawler,
     "render": GenericRenderCrawler,   # 通用渲染爬虫(自动选主选择器)：长尾自建 SPA 站
+    "greenvalley": GreenvalleyCrawler,
     "static_html": StaticHtmlCrawler,  # 通用静态官网职位列表页
 
     # 协作机器人 + 造车

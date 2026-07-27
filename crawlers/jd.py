@@ -16,8 +16,10 @@ class JDCrawler(BaseCrawler):
     PAGE_API = "https://campus.jd.com/api/wx/position/page"
     PAGE_SIZE = 50
     MAX_PAGES = 20
-    JD_RAW_LIMIT = 1000
-    TYPES = ("present", "talent", "internship")
+    JD_RAW_LIMIT = 12000
+    # present/talent are formal campus tracks. Internship is intentionally
+    # excluded because many internship titles do not contain the word 实习.
+    TYPES = ("present", "talent")
 
     def _headers(self) -> dict:
         return {
@@ -53,17 +55,17 @@ class JDCrawler(BaseCrawler):
         except Exception:  # noqa: BLE001
             return ""
 
-    def _fetch_type(self, recruit_type: str, plan_ids: list[int]) -> list[dict]:
+    def _fetch_type(self, recruit_type: str, plan_ids: list[int] | None = None) -> list[dict]:
         jobs, seen = [], set()
-        page = 1
+        page = 0
         total_pages = 1
-        while page <= min(total_pages, self.MAX_PAGES):
+        while page < min(total_pages, self.MAX_PAGES):
             payload = {
                 "pageSize": self.PAGE_SIZE,
                 "pageIndex": page,
                 "parameter": {
                     "positionName": "",
-                    "planIdList": plan_ids,
+                    "planIdList": plan_ids or [],
                     "jobDirectionCodeList": [],
                     "workCityCodeList": [],
                     "positionDeptList": [],
@@ -98,8 +100,10 @@ class JDCrawler(BaseCrawler):
                     city = req.get("workCity")
                     if city and city not in cities:
                         cities.append(city)
+                duties = str(item.get("workContent") or "").strip()
+                requirements = str(item.get("qualification") or "").strip()
                 jd_raw = "\n".join(
-                    x for x in [item.get("workContent") or "", item.get("qualification") or ""] if x
+                    x for x in ["岗位职责", duties, "任职要求", requirements] if x
                 )
                 jobs.append(self._make_job(
                     title=title,
@@ -117,9 +121,11 @@ class JDCrawler(BaseCrawler):
         return jobs
 
     def fetch(self) -> list[dict]:
-        plan_ids = self._plan_ids()
         jobs = []
         for recruit_type in self.TYPES:
-            jobs.extend(self._fetch_type(recruit_type, plan_ids.get(recruit_type, [])))
+            # The current public page starts from pageIndex=0 and leaves
+            # planIdList empty until the user selects a sub-project. Sending
+            # getProjectList IDs by default now produces an empty result.
+            jobs.extend(self._fetch_type(recruit_type))
         logger.info("[%s] 京东抓到 %d 个岗位", self.company_name, len(jobs))
         return jobs

@@ -14,7 +14,7 @@ class OppoCrawler(BaseCrawler):
     API = "https://careers.oppo.com/openapi/position/pageNew"
     PAGE_SIZE = 100
     MAX_PAGES = 5
-    JD_RAW_LIMIT = 1000
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -52,14 +52,14 @@ class OppoCrawler(BaseCrawler):
                 if not title or job_id in seen:
                     continue
                 seen.add(job_id)
-                jd_raw = "\n".join(
-                    x for x in [
-                        item.get("projectName") or "",
-                        item.get("positionTypeName") or "",
-                        item.get("positionDesc") or "",
-                        item.get("positionRequire") or "",
-                    ] if x
-                )
+                duties = str(item.get("positionDesc") or "").strip()
+                requirements = str(item.get("positionRequire") or "").strip()
+                jd_raw = "\n".join(x for x in [
+                    item.get("projectName") or "",
+                    item.get("positionTypeName") or "",
+                    "岗位职责", duties,
+                    "任职要求", requirements,
+                ] if x)
                 jobs.append(self._make_job(
                     title=title,
                     city=(item.get("workCityName") or "")[:80],

@@ -6,7 +6,7 @@
 写 config 由 validate_company.py 验证后**文本追加**完成（保留注释），本脚本不再碰 config。
 
 用法：
-    python scripts/import_companies.py --csv path/to/companies.csv
+    python scripts/import_companies.py                  # Phase 1：活跃链接的平台方向公司
     python scripts/import_companies.py --revive-beisen  # Phase 2：「假死」北森（登录/个人页），URL 归一化为 /campus/jobs
     python scripts/import_companies.py --out data/candidates.json   # 自定义输出路径
 """
@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import yaml
 
+CSV_PATH = r"C:\Users\周帅康\Desktop\师兄资料\公司清单_清洗后.csv"
 ROOT = Path(__file__).parent.parent
 CONFIG_PATH = ROOT / "config.yaml"
 DEFAULT_OUT = ROOT / "data" / "candidates.json"
@@ -140,14 +141,11 @@ def select_all(rows, existing):
 
 def main():
     argv = sys.argv[1:]
-    if "--csv" not in argv:
-        raise SystemExit("用法: python scripts/import_companies.py --csv path/to/companies.csv [--all|--revive-beisen]")
-    csv_path = Path(argv[argv.index("--csv") + 1])
     revive = "--revive-beisen" in argv
     all_mode = "--all" in argv
     out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else DEFAULT_OUT
 
-    rows = list(csv.DictReader(open(csv_path, encoding="utf-8-sig")))
+    rows = list(csv.DictReader(open(CSV_PATH, encoding="utf-8-sig")))
     existing = load_existing()
     if all_mode:
         entries = select_all(rows, existing)

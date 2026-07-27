@@ -4,6 +4,7 @@ from collections import Counter
 from datetime import date
 
 import job_filters
+import job_cohorts
 import requests
 
 logger = logging.getLogger(__name__)
@@ -26,15 +27,23 @@ def _is_intern_title(title: str) -> bool:
 
 
 def _is_current_cohort(job: dict) -> bool:
-    """与主页面一致：仅保留 27 届或届别尚未明确的岗位。"""
-    year = job_filters.cohort_year(job)
-    return year is None or year >= 2027
+    """与主页面一致：仅保留有官方证据确认的 27 届岗位。"""
+    explicit = job_cohorts.explicit_job_cohort(job)
+    if (
+        explicit["cohort_status"] == "confirmed"
+        and explicit["cohort"] != job_cohorts.CURRENT_COHORT
+    ):
+        return False
+    return job_cohorts.is_confirmed_current(job)
 
 
 def _truncate(text: str, max_len: int = _CITY_TRUNCATE_LEN) -> str:
     """超过 max_len 字符截断并追加 …。"""
     s = (text or "").strip()
     return s if len(s) <= max_len else s[: max_len] + "…"
+
+
+_REPORT_BASE_URL = "https://career-agent-4z4.pages.dev"
 
 
 def _report_url(date_str: str = "") -> str:
@@ -45,13 +54,7 @@ def _report_url(date_str: str = "") -> str:
     只会更新 index.html。故飞书链接指 index.html 才能看到最新岗位 + 投递记录。
     date_str 仅为兼容旧调用，已不参与拼接。
     """
-    base_url = os.environ.get("REPORT_BASE_URL", "").strip().rstrip("/")
-    if not base_url:
-        repository = os.environ.get("GITHUB_REPOSITORY", "").strip()
-        if "/" in repository:
-            owner, repo = repository.split("/", 1)
-            base_url = f"https://{owner}.github.io/{repo}"
-    return f"{base_url}/index.html" if base_url else ""
+    return f"{_REPORT_BASE_URL}/index.html"
 
 
 def _format_new_job(item: dict) -> list[list[dict]]:

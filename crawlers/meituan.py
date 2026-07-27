@@ -3,11 +3,11 @@
 campus.meituan.com 跳转到 zhaopin.meituan.com/web/campus（校园招聘官网）。
 其职位列表 API 公开免鉴权：
     POST https://zhaopin.meituan.com/api/official/job/getJobList
-    body: {"keyword":"", "recruitmentType":"CAMPUS_HIRING",
-           "page":{"pageNo":N, "pageSize":100}}   # 翻页必须是嵌套 page 对象
+    body: {"page":{"pageNo":N, "pageSize":100},
+           "jobType":[{"code":"1", "subCode":[]}], ...}
     resp: data.list[]（name=职位名, cityList[].name=地点, jobUnionId=唯一标识,
           jobDuty/jobRequirement=JD）+ data.page.totalPage/totalCount。
-校招约 2900 岗。实习岗由 reporter 按标题统一隐藏。
+官网把正式校招和实习分别编码为 jobType=1/2；这里只请求正式校招。
 """
 import logging
 import time
@@ -22,9 +22,8 @@ logger = logging.getLogger(__name__)
 class MeituanCrawler(BaseCrawler):
     API = "https://zhaopin.meituan.com/api/official/job/getJobList"
     PAGE_SIZE = 100
-    MAX_PAGES = 40  # 校招约 2900 岗 / 100 = 30 页，留余量
-    JD_RAW_LIMIT = 300
-    RECRUIT_TYPE = "CAMPUS_HIRING"
+    MAX_PAGES = 10
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -32,11 +31,21 @@ class MeituanCrawler(BaseCrawler):
             "Content-Type": "application/json",
             "Referer": "https://zhaopin.meituan.com/web/campus",
             "Origin": "https://zhaopin.meituan.com",
+            "X-Requested-With": "XMLHttpRequest",
         }
         jobs, seen = [], set()
         for page in range(1, self.MAX_PAGES + 1):
-            body = {"keyword": "", "recruitmentType": self.RECRUIT_TYPE,
-                    "page": {"pageNo": page, "pageSize": self.PAGE_SIZE}}
+            body = {
+                "page": {"pageNo": page, "pageSize": self.PAGE_SIZE},
+                "jobShareType": "1",
+                "keywords": "",
+                "cityList": [],
+                "department": [],
+                "jfJgList": [],
+                "jobType": [{"code": "1", "subCode": []}],
+                "typeCode": [],
+                "specialCode": [],
+            }
             data = None
             for attempt in range(3):  # 大站偶发限流/SSL 中断，轻量重试
                 try:
@@ -53,6 +62,8 @@ class MeituanCrawler(BaseCrawler):
             if not plist:
                 break
             for x in plist:
+                if str(x.get("jobType") or "") != "1":
+                    continue
                 jid = str(x.get("jobUnionId") or "")
                 if not jid or jid in seen:
                     continue
@@ -61,8 +72,15 @@ class MeituanCrawler(BaseCrawler):
                 if not title or len(title) < 2:
                     continue
                 city = "、".join(c.get("name", "") for c in (x.get("cityList") or []) if c.get("name"))[:40]
-                jd_raw = (x.get("jobDuty") or x.get("jobRequirement") or x.get("desc") or "")[:self.JD_RAW_LIMIT]
-                jd_url = f"https://zhaopin.meituan.com/web/campus/position-detail?jobId={jid}"
+                duties = str(x.get("jobDuty") or x.get("desc") or "").strip()
+                requirements = str(x.get("jobRequirement") or "").strip()
+                jd_raw = "\n".join(
+                    part for part in ["岗位职责", duties, "任职要求", requirements] if part
+                )[:self.JD_RAW_LIMIT]
+                jd_url = (
+                    "https://zhaopin.meituan.com/web/position/detail"
+                    f"?jobUnionId={jid}&highlightType=campus"
+                )
                 jobs.append(self._make_job(title=title, city=city, jd_url=jd_url, jd_raw=jd_raw))
             page_info = data.get("page") or {}
             if page >= (page_info.get("totalPage") or 0):

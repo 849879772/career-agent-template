@@ -1,6 +1,19 @@
 companies:
+- name: 微步在线
+  careers_url: https://app.mokahr.com/campus_apply/threatbook/39679?recommendCode=DSUK2sNv#/jobs
+  crawler: moka
+- name: 思特威
+  careers_url: https://app.mokahr.com/campus_apply/smartsenstech1/56088?recommendCode=DS2NEFMs#/jobs
+  crawler: moka
+- name: MiniMax
+  careers_url: https://vrfi1sk8a0.jobs.feishu.cn/s/kGKwaJ_fg7g
+  crawler: feishu
+- name: 同花顺
+  careers_url: https://campus.10jqka.com.cn/job/list?type=school
+  crawler: render
 - name: 大疆
   careers_url: https://apply.careers.dji.com/campus-recruitment/dji/143359?locale=zh-CN#/
+  campaign_url: https://we.dji.com/zh-CN/campus
   crawler: dji
 - name: 小米
   careers_url: https://xiaomi.jobs.f.mioffice.cn/
@@ -68,9 +81,6 @@ companies:
 - name: 灵犀互娱
   careers_url: https://talent.lingxigames.com/campus/position
   crawler: alibaba
-- name: 灵犀互娱（游戏侧开-广州-8.5发布）尽早投
-  careers_url: https://talent.lingxigames.com/campus/position
-  crawler: alibaba
 - name: 飞猪
   careers_url: https://career.fliggy.com/campus/position
   crawler: alibaba
@@ -86,16 +96,10 @@ companies:
 - name: 米哈游
   careers_url: https://jobs.mihoyo.com/#/campus
   crawler: mihoyo
-- name: miHoYo
-  careers_url: https://jobs.mihoyo.com/#/campus
-  crawler: mihoyo
 - name: 吉比特
   careers_url: https://hr.g-bits.com/web/index.html
   crawler: gbits
 - name: 京东
-  careers_url: https://campus.jd.com/
-  crawler: jd
-- name: 京东实习
   careers_url: https://campus.jd.com/
   crawler: jd
 - name: 百度
@@ -105,9 +109,6 @@ companies:
   careers_url: https://campus.kuaishou.cn/
   crawler: kuaishou
 - name: OPPO
-  careers_url: https://careers.oppo.com/university/oppo/recruitment/post
-  crawler: oppo
-- name: oppo
   careers_url: https://careers.oppo.com/university/oppo/recruitment/post
   crawler: oppo
 - name: 顺丰
@@ -155,9 +156,6 @@ companies:
 - name: 凌云光
   careers_url: https://app.mokahr.com/campus_apply/lusterinc/44882
   crawler: moka
-- name: 影石
-  careers_url: https://arashivision.jobs.feishu.cn/campus/position/application
-  crawler: feishu
 - name: 基恩士
   careers_url: https://keyence.zhiye.com/campus/jobs
   crawler: beisen
@@ -170,12 +168,12 @@ companies:
 - name: 图森智途
   careers_url: https://app.mokahr.com/campus-recruitment/tusenweilai/72214
   crawler: moka
+- name: 图森智途
+  careers_url: https://app.mokahr.com/recommendation-apply/tusenweilai/3234
+  crawler: moka
 - name: 佑驾创新
   careers_url: https://app.mokahr.com/campus-recruitment/minieye/118571
   crawler: moka
-- name: 德赛西威
-  careers_url: https://yesv-desaysv.jobs.feishu.cn/campus/position/application
-  crawler: feishu
 - name: 中科寒武纪
   careers_url: https://app.mokahr.com/campus-recruitment/cambricon/44201
   crawler: moka
@@ -317,7 +315,7 @@ companies:
 - name: 搜狐畅游
   careers_url: https://app.mokahr.com/campus-recruitment/cyou-inc/42233
   crawler: moka
-- name: 亿联网络提前批
+- name: 亿联网络
   careers_url: https://yealink.zhiye.com/campus/jobs
   crawler: beisen
 - name: 启源芯动力
@@ -401,12 +399,9 @@ companies:
 - name: 其域创新
   careers_url: https://pecivkvtit.jobs.feishu.cn/252342/position/application
   crawler: feishu
-- name: 锐捷
+- name: 锐捷网络
   careers_url: https://app.mokahr.com/campus-recruitment/ruijie/136206
   crawler: moka
-- name: 零跑
-  careers_url: https://leapmotor.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 数禾科技
   careers_url: https://shuhegroup1.zhiye.com/campus/jobs
   crawler: beisen
@@ -440,9 +435,6 @@ companies:
 - name: 阿维塔
   careers_url: https://xcn5vbnquq58.jobs.feishu.cn/915151/position/application
   crawler: feishu
-- name: 大华
-  careers_url: https://dahua.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 作业帮
   careers_url: https://app.mokahr.com/campus-recruitment/zuoyebang/144908
   crawler: moka
@@ -476,7 +468,7 @@ companies:
 - name: 宏盛股份
   careers_url: https://app.mokahr.com/campus-recruitment/sinexcel/74287
   crawler: moka
-- name: shein
+- name: SHEIN
   careers_url: https://app.mokahr.com/campus-recruitment/shein/2932
   crawler: moka
 - name: 星网锐捷
@@ -517,9 +509,6 @@ companies:
   crawler: feishu
 - name: 东莞新能德
   careers_url: https://nvtpower.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 优比选
-  careers_url: https://ubtrobot.zhiye.com/campus/jobs
   crawler: beisen
 - name: 记忆科技
   careers_url: https://ramaxel.zhiye.com/campus/jobs
@@ -569,7 +558,7 @@ companies:
 - name: 云智研发
   careers_url: https://app-tc.mokahr.com/campus-recruitment/csig/20001
   crawler: moka
-- name: 创达
+- name: 中科创达
   careers_url: https://thundersoft.jobs.feishu.cn/campus/position/application
   crawler: feishu
 - name: 云账房
@@ -599,36 +588,9 @@ companies:
 - name: 中信科
   careers_url: https://cictmobile.zhiye.com/campus/jobs
   crawler: beisen
-- name: 图森牛客内推
-  careers_url: https://app.mokahr.com/recommendation-apply/tusenweilai/3234
-  crawler: moka
-- name: 理想内推
-  careers_url: https://li.jobs.feishu.cn/referral/campus/position/application
-  crawler: feishu
-- name: 元戎启行
-  careers_url: https://app.mokahr.com/campus_apply/deeproute/6487
-  crawler: moka
 - name: 航天811所
   careers_url: https://sast.zhiye.com/campus/jobs
   crawler: beisen
-- name: 中兴
-  careers_url: https://app.mokahr.com/campus-recruitment/zte/46903
-  crawler: moka
-- name: 上海燧原科技
-  careers_url: https://app.mokahr.com/campus_apply/enflame/40892
-  crawler: moka
-- name: 传音控股
-  careers_url: https://transsion.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 基恩士sb小日本
-  careers_url: https://keyence.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 龙旗科技nksb
-  careers_url: https://longcheerzp1.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 去哪儿旅行内推
-  careers_url: https://app.mokahr.com/recommendation-apply/qunar/4208
-  crawler: moka
 - name: 中海达
   careers_url: https://zhdgps.zhiye.com/campus/jobs
   crawler: beisen
@@ -641,15 +603,9 @@ companies:
 - name: 九洲集团
   careers_url: https://jezetek.zhiye.com/campus/jobs
   crawler: beisen
-- name: 重庆长安汽车
-  careers_url: https://changan.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 北森
   careers_url: https://beisen.zhiye.com/campus/jobs
   crawler: beisen
-- name: 绿盟科技
-  careers_url: https://app.mokahr.com/campus_apply/nsfocus/29118
-  crawler: moka
 - name: 炬芯科技
   careers_url: https://app.mokahr.com/campus-recruitment/actions-semi/92622
   crawler: moka
@@ -662,38 +618,17 @@ companies:
 - name: 中汇会计师事务所
   careers_url: https://zhcpa.zhiye.com/campus/jobs
   crawler: beisen
-- name: 福建博思软件
-  careers_url: https://app.mokahr.com/campus-recruitment/bosssoft/68370
-  crawler: moka
 - name: FunPlus
   careers_url: https://app.mokahr.com/campus_apply/funplus01/23962
   crawler: moka
 - name: 亿嘉和
   careers_url: https://yijiahe.zhiye.com/campus/jobs
   crawler: beisen
-- name: 星猿哲科技
-  careers_url: https://app.mokahr.com/campus_apply/xyzrobotics/26847
-  crawler: moka
-- name: SHEIN
-  careers_url: https://app.mokahr.com/campus_apply/shein/2932
-  crawler: moka
 - name: 波士顿科学
   careers_url: https://app.mokahr.com/campus-recruitment/bostonscientific/102308
   crawler: moka
 - name: 兆易创新
   careers_url: https://app.mokahr.com/campus-recruitment/gigadevice/92215
-  crawler: moka
-- name: 腾讯云智
-  careers_url: https://app-tc.mokahr.com/campus-recruitment/csig/20001
-  crawler: moka
-- name: 零跑科技
-  careers_url: https://leapmotor.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 浙江大华
-  careers_url: https://dahua1.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 锐捷网络
-  careers_url: https://app.mokahr.com/campus-recruitment/ruijie/116161
   crawler: moka
 - name: 富途集团
   careers_url: https://app.mokahr.com/campus_apply/futu5/78059
@@ -704,20 +639,11 @@ companies:
 - name: 广州金升阳
   careers_url: https://mornsun.zhiye.com/campus/jobs
   crawler: beisen
-- name: 北京图森智途
-  careers_url: https://app.mokahr.com/campus-recruitment/tusenweilai/72214
-  crawler: moka
 - name: 深圳依时货拉拉
   careers_url: https://app.mokahr.com/campus-recruitment/huolalahr/98660
   crawler: moka
-- name: 杭州行芯科技
-  careers_url: https://app.mokahr.com/campus-recruitment/phlexing/100123
-  crawler: moka
 - name: 惠州市德赛西威汽车
   careers_url: https://desaysv.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 海信集团
-  careers_url: https://hisense.zhiye.com/campus/jobs
   crawler: beisen
 - name: 长园深瑞继保
   careers_url: https://sznari.zhiye.com/campus/jobs
@@ -731,9 +657,6 @@ companies:
 - name: 银星智能
   careers_url: https://szyxjt.zhiye.com/campus/jobs
   crawler: beisen
-- name: 影石Insta360
-  careers_url: https://arashivision.jobs.feishu.cn/campus/position/application
-  crawler: feishu
 - name: 众合科技
   careers_url: https://wecruit.hotjob.cn/SU611374bbbef57c653306500d/pb/account.html
   crawler: hotjob
@@ -785,11 +708,8 @@ companies:
 - name: 卓望公司
   careers_url: https://app.mokahr.com/campus-recruitment/aspire/100261
   crawler: moka
-- name: 云天励飞
-  careers_url: https://intellif1.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 科大讯飞
-  careers_url: https://iflytek.zhiye.com/campus/jobs
+  careers_url: https://iflytek.zhiye.com/5/jobs?shareId=42d8a3f4-fb5b-4fbb-b3cd-bb1049ae71c0&shareSource=2
   crawler: beisen
 - name: 英飞源
   careers_url: https://infypower.zhiye.com/campus/jobs
@@ -900,8 +820,8 @@ companies:
   careers_url: https://www.wind.com.cn/portal/zh/JoinUs/recruit.html?positionType=9002&channelPositionId=39
   crawler: render
 - name: 广立微
-  careers_url: https://www.semitronix.com/joinus/job-list/
-  crawler: render
+  careers_url: https://app.mokahr.com/campus-recruitment/semitronix/140043
+  crawler: moka
 - name: 美的
   careers_url: https://careers.midea.com/recruit-school-out
   crawler: render
@@ -909,8 +829,8 @@ companies:
   careers_url: https://maker.haier.net/client/job/index
   crawler: render
 - name: 网易互娱
-  careers_url: https://game.campus.163.com/position
-  crawler: render
+  careers_url: https://campus.game.163.com/app/job/position?id=102
+  crawler: netease
 - name: 中新赛克
   careers_url: https://recruit.sinovatio.com/positions
   crawler: render
@@ -926,15 +846,6 @@ companies:
 - name: CVTE
   careers_url: https://campus.cvte.com/position
   crawler: cvte
-- name: 视源股份
-  careers_url: https://campus.cvte.com/position
-  crawler: cvte
-- name: 海康sb公司
-  careers_url: https://campushr.hikvision.com/school
-  crawler: hikvision
-- name: 哔哩哔哩（侧开-上海-8.1）
-  careers_url: https://jobs.bilibili.com/campus/positions
-  crawler: bilibili
 - name: 超聚变
   careers_url: https://career.xfusion.com/OfficialPortal/#/campusList?subChannel=1
   crawler: render
@@ -944,9 +855,6 @@ companies:
 - name: 复旦微电子
   careers_url: https://www.fmsh.com/school/
   crawler: render
-- name: 泰凌微电子
-  careers_url: https://telink.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 纵目科技
   careers_url: https://zongmu.zhiye.com/campus/jobs
   crawler: beisen
@@ -954,9 +862,6 @@ companies:
   careers_url: https://hr.tp-link.com.cn/
   crawler: render
 - name: TP-Link联洲
-  careers_url: https://join.tplinkglobal.com/campus/
-  crawler: render
-- name: tplink
   careers_url: https://join.tplinkglobal.com/campus/
   crawler: render
 - name: 中国平安
@@ -971,22 +876,10 @@ companies:
 - name: 博睿康
   careers_url: https://www.neuracle.cn/rczp
   crawler: render
-- name: 广东联通
-  careers_url: https://zglt.iguopin.com/job1
-  crawler: render
 - name: 广汽集团-埃安
   careers_url: https://www.aion.com.cn/show/join
   crawler: render
-- name: 广电运通-姚孃
-  careers_url: https://app.mokahr.com/campus-recruitment/grgbanking/39448
-  crawler: moka
-- name: 恩智浦Qq!
-  careers_url: https://www.nxp.com.cn/company/about-nxp/careers/students-and-new-graduates%3ASTUDENT
-  crawler: render
 - name: 招商银行招银网络科技
-  careers_url: https://cmbnt.cmbchina.com
-  crawler: render
-- name: 招银网络科技
   careers_url: https://cmbnt.cmbchina.com
   crawler: render
 - name: 新凯来
@@ -1007,7 +900,7 @@ companies:
 - name: 江苏芯云电子
   careers_url: http://www.jsnebula.com/list_29/
   crawler: render
-- name: 航天飞鹏-央企
+- name: 航天飞鹏
   careers_url: https://www.iguopin.com/company?id=10685384244169370
   crawler: render
 - name: 菜鸟
@@ -1025,7 +918,7 @@ companies:
 - name: 长川科技
   careers_url: http://hrm-out.hzcctech.com:8083/RedseaPlatform/zhaopin/zpChannelQrCode/a3c82653-df31-47ea-8561-b634675cc88c/officeWebsite.mob
   crawler: render
-- name: 阿里云（侧开-北上深杭-8.5发布9.1结束）尽早投
+- name: 阿里云
   careers_url: https://careers.aliyun.com/campus/home
   crawler: render
 - name: 阿里国际
@@ -1037,53 +930,29 @@ companies:
 - name: 九阳
   careers_url: https://zhaopin.joyoung.com/mobile/recruit/campus.html
   crawler: render
-- name: 云创智行实习
-  careers_url: https://www.yczx.tech/join/campus
-  crawler: render
-- name: 匠芯创科技(hr邮箱)
+- name: 匠芯创科技
   careers_url: https://www.artinchip.com/Join-Us
   crawler: render
 - name: 合合信息
   careers_url: https://intsig.zhiye.com/campus/jobs
   crawler: beisen
-- name: 因诺科技(hr邮箱)
+- name: 因诺科技
   careers_url: https://www.innno.net/
   crawler: render
-- name: 实习僧AMD
-  careers_url: https://careers.amd.com/students/jobs
-  crawler: render
-- name: 实习僧autowise.ai
-  careers_url: https://autowise.ai/careers/
-  crawler: render
-- name: 实习僧momenta
-  careers_url: https://momenta.jobs.feishu.cn/campus/m/
-  crawler: feishu
-- name: 实习僧小鹏
-  careers_url: https://xiaopeng.jobs.feishu.cn/campus/
-  crawler: feishu
-- name: 实习僧特斯拉
-  careers_url: https://www.tesla.cn/careers/internships
-  crawler: render
-- name: 实习僧速腾
-  careers_url: https://app.mokahr.com/campus-recruitment/robosense/69887
-  crawler: moka
-- name: 思格新能源nk
+- name: 思格新能源
   careers_url: https://www.sigenergy.com/cn/careers
   crawler: render
 - name: 成谷科技
   careers_url: https://www.cgutech.com/jrwm
   crawler: render
-- name: 成都精灵云nk
+- name: 成都精灵云
   careers_url: https://www.ghostcloud.cn/
   crawler: render
-- name: 旷世科技-极感科技（图像算法工程师（人像感知方向）北京/成都-8.4发布）五天内投，不抱希望试试看
+- name: 旷视科技
   careers_url: https://app.mokahr.com/m/campus-recruitment/megviihr/146855
   crawler: moka
-- name: 曦华科技nk
+- name: 曦华科技
   careers_url: https://www.cvachip.com/gongsixinwen/5bvIg9Rk1KPx.html
-  crawler: render
-- name: 柠檬微趣（初级测试工程师-北京-8.1发布-10-14k）五天内投
-  careers_url: https://www.microfun.com/beijingLnternet.html
   crawler: render
 - name: 盛趣游戏
   careers_url: https://www.shengqugames.com/cn/join
@@ -1091,6 +960,7 @@ companies:
 - name: 纳睿雷达
   careers_url: https://www.naruida.com/linian_1/5.html
   crawler: render
+  link_kind: list
 - name: 绿联
   careers_url: https://careers.lulian.cn/
   crawler: render
@@ -1100,12 +970,9 @@ companies:
 - name: 达美盛
   careers_url: https://www.dms365.com/newsinfo/2534167.html
   crawler: render
-- name: 阿里平头哥（侧开-上海-8.8）15天内投
+- name: 阿里平头哥
   careers_url: https://recruitment.t-head.cn/campus/home?sessionid=
   crawler: render
-- name: 陶天集团（侧开-上海-8.4发布）五天内投
-  careers_url: https://talent.taotian.com/campus/home
-  crawler: alibaba
 - name: 中国邮政
   careers_url: https://chinapost2026.zhaopin.com/
   crawler: render
@@ -1148,14 +1015,8 @@ companies:
 - name: 华睿科技
   careers_url: https://irayple.zhiye.com/campus/jobs
   crawler: beisen
-- name: 壁仞科技
-  careers_url: https://app.mokahr.com/campus-recruitment/biren/44727
-  crawler: moka
 - name: 大族激光
   careers_url: https://app.mokahr.com/campus-recruitment/hanslaser/46383
-  crawler: moka
-- name: 广电运通
-  careers_url: https://app.mokahr.com/campus-recruitment/grgbanking/39448
   crawler: moka
 - name: 影石
   careers_url: https://arashivision.jobs.feishu.cn/campus
@@ -1163,12 +1024,6 @@ companies:
 - name: 德赛西威
   careers_url: https://yesv-desaysv.jobs.feishu.cn/campus
   crawler: feishu
-- name: 成都鼎桥通信
-  careers_url: https://td-tech.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 捷顺科技
-  careers_url: https://jieshun.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 新兴产业投资
   careers_url: https://dggmt.zhiye.com/campus/jobs
   crawler: beisen
@@ -1181,26 +1036,14 @@ companies:
 - name: 洲明科技
   careers_url: https://unilumin.zhiye.com/campus/jobs
   crawler: beisen
-- name: 浙江中控技术
-  careers_url: https://app.mokahr.com/campus-recruitment/supcon/148189
-  crawler: moka
 - name: 元戎启行
   careers_url: https://app.mokahr.com/campus-recruitment/deeproute/145894
   crawler: moka
-- name: 深圳康冠科技
-  careers_url: https://careerktc.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 维谛技术
   careers_url: https://app.mokahr.com/campus-recruitment/vertiv/118713
   crawler: moka
-- name: 绿盟科技
-  careers_url: https://app.mokahr.com/campus_apply/nsfocus/29118
-  crawler: moka
 - name: 羚控科技
   careers_url: https://lyncon.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 诺瓦星云
-  careers_url: https://novastar.zhiye.com/campus/jobs
   crawler: beisen
 - name: 豪鹏科技
   careers_url: https://wecruit.hotjob.cn/SU611e3a2c2f9d24229e05a18d/pb/school.html
@@ -1216,7 +1059,7 @@ companies:
   crawler: render
 - name: 国家开发投资集团
   careers_url: https://sdic1.iguopin.com/jobCampus
-  crawler: render
+  crawler: iguopin
 - name: 希望森兰
   careers_url: https://www.chinavvvf.com/list-28-1.html
   crawler: render
@@ -1247,12 +1090,6 @@ companies:
 - name: 三一集团
   careers_url: https://sany.zhiye.com/campus/jobs
   crawler: beisen
-- name: 龙旗科技
-  careers_url: https://longcheerzp1.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 中兴通讯
-  careers_url: https://job.zte.com.cn/cn/campus-recruitment/Recruitment_positions/freshstudent.html
-  crawler: render
 - name: 中元汇吉
   careers_url: https://zybio.zhiye.com/campus/jobs
   crawler: beisen
@@ -1261,16 +1098,13 @@ companies:
   crawler: hotjob
 - name: 中国联通
   careers_url: https://zglt.iguopin.com/job
-  crawler: render
+  crawler: iguopin
 - name: 中国兵器工业集团
   careers_url: https://norincogroupzhaopin.zhiye.com/campus/jobs
   crawler: beisen
-- name: 中国网安三十所
-  careers_url: https://app.mokahr.com/campus_apply/cetc30/36270
-  crawler: moka
-- name: 中科创达
-  careers_url: https://thundersoft.jobs.feishu.cn/campus
-  crawler: feishu
+- name: 零跑汽车
+  careers_url: https://leapmotor1.zhiye.com/campus/jobs
+  crawler: beisen
 - name: 云圣智能
   careers_url: https://ikingtec.zhiye.com/campus/jobs
   crawler: beisen
@@ -1278,14 +1112,11 @@ companies:
   careers_url: https://jobs.bitmain.com.cn/students
   crawler: render
 - name: 埃科光电
-  careers_url: http://career.i-tek.cn/
-  crawler: render
-- name: 零跑汽车
-  careers_url: https://leapmotor1.zhiye.com/campus/jobs
-  crawler: beisen
+  careers_url: http://career.i-tek.cn/front.home.index/schoolList
+  crawler: itek
 - name: 数字绿土
-  careers_url: https://campus.51job.com/greenvalley/si.html
-  crawler: render
+  careers_url: https://campus.51job.com/greenvalley/san.html
+  crawler: greenvalley
 - name: 芯动科技
   careers_url: https://innosilicon.zhiye.com/campus/jobs
   crawler: beisen
@@ -1298,18 +1129,16 @@ companies:
 - name: 同有科技
   careers_url: https://www.toyou.com.cn/Tongyou/ShoolJoin/
   crawler: render
-- name: 佰维存储
-  careers_url: https://biwin1.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 同程旅行
-  careers_url: https://promotion.elong.com/index/cn/campus/yjszp.html?type=zpgw
+  careers_url: https://mhr.ly.com/recruit/schoolPortal/#/postDelivery
   crawler: render
 - name: 易思维
   careers_url: https://isv-tech.zhiye.com/campus/jobs
   crawler: beisen
 - name: 昂瑞微
   careers_url: https://www.onmicro.com.cn/xyzp/230.html
-  crawler: render
+  crawler: static_html
+  link_kind: list
 - name: 泰凌微电子
   careers_url: https://telink.m.zhiye.com/#/jobs?jc=2
   crawler: render
@@ -1322,30 +1151,18 @@ companies:
 - name: 北方华创
   careers_url: https://www.naura.com/join/index.html
   crawler: render
-- name: B站
-  careers_url: https://jobs.bilibili.com/campus/positions
-  crawler: bilibili
 - name: 东方电气
   careers_url: https://dec2026.iguopin.com/job
-  crawler: render
+  crawler: iguopin
 - name: 中国汽研
   careers_url: https://www.caeri.com.cn/zgqy/jrwm/rczp/xyzp/
   crawler: render
 - name: 中冶赛迪
   careers_url: https://campus.51job.com/cisdi/job.html
   crawler: render
-- name: 中科曙光
-  careers_url: https://sugon.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 九州科技
   careers_url: https://www.jiuzhoutech.com/cn/xyrsnews.asp
   crawler: render
-- name: 人大金仓
-  careers_url: https://app.mokahr.com/campus-recruitment/kingbase/47259
-  crawler: moka
-- name: 亿联网络
-  careers_url: https://yealink.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 北汽集团
   careers_url: https://baicgroup.zhiye.com/campus/jobs
   crawler: beisen
@@ -1358,17 +1175,11 @@ companies:
 - name: 吉祥腾达
   careers_url: https://tenda.zhiye.com/campus/jobs
   crawler: beisen
-- name: 广汽集团
-  careers_url: https://gacrnd.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 开立医疗
   careers_url: https://app.mokahr.com/campus-recruitment/sonoscape/94392
   crawler: moka
 - name: 摩尔线程
   careers_url: https://mthreads.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 新易盛
-  careers_url: https://eoptolink.zhiye.com/campus/jobs
   crawler: beisen
 - name: 晶晨半导体
   careers_url: https://amlogicsh.zhiye.com/campus/jobs
@@ -1378,7 +1189,7 @@ companies:
   crawler: render
 - name: 拼多多
   careers_url: https://careers.pddglobalhr.com/campus/grad
-  crawler: render
+  crawler: pdd
 - name: 延锋
   careers_url: https://app.mokahr.com/m/campus-recruitment/yanfeng/45086
   crawler: moka
@@ -1397,38 +1208,20 @@ companies:
 - name: 石头科技
   careers_url: https://roborock.zhiye.com/campus/jobs
   crawler: beisen
-- name: 联影医疗
-  careers_url: https://united-imaging.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 芯原股份
   careers_url: https://campus.51job.com/VeriSilicon2026
-  crawler: render
-- name: 紫光同创
-  careers_url: https://www.pangomicro.com/join_school/
   crawler: render
 - name: 舜宇集团
   careers_url: https://app.mokahr.com/m/campus_apply/sunnyoptical/45602
   crawler: moka
-- name: 米哈游
-  careers_url: https://jobs.mihoyo.com/
-  crawler: mihoyo
 - name: 豪威集团
   careers_url: https://ovt-omnivision.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 长安汽车
-  careers_url: https://changan.zhiye.com/campus/jobs
   crawler: beisen
 - name: 长江存储
   careers_url: https://ymtc-campus.zhiye.com
   crawler: beisen
 - name: 高新兴
   careers_url: https://gosuncn.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 顶点软件
-  careers_url: https://wecruit.hotjob.cn/SU62d669e0bef57c0f7dbabacf/pb/school.html
-  crawler: hotjob
-- name: 鼎桥通讯
-  careers_url: https://td-tech.zhiye.com/campus/jobs
   crawler: beisen
 - name: 爱瑞无线
   careers_url: https://app.mokahr.com/su/chumxr
@@ -1439,9 +1232,6 @@ companies:
 - name: 电科莱斯
   careers_url: https://app.mokahr.com/campus_apply/cetcles/40889
   crawler: moka
-- name: 星网锐捷
-  careers_url: https://starnet.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 神驰机电
   careers_url: https://senci.zhiye.com/campus/jobs
   crawler: beisen
@@ -1457,18 +1247,12 @@ companies:
 - name: 万华化学
   careers_url: https://www.whchem.com/column/164/
   crawler: render
-- name: 华大BGI
-  careers_url: https://genomics.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 华润集团
   careers_url: https://runjob.crc.com.cn/
   crawler: render
 - name: 上海复旦微电子
   careers_url: https://campus.51job.com/fmsh2026/p2.html
   crawler: render
-- name: 中科曙光
-  careers_url: https://sugon.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 恩智浦
   careers_url: https://campus.51job.com/nxp/graduates.html
   crawler: render
@@ -1493,9 +1277,6 @@ companies:
 - name: 云天励飞
   careers_url: https://intellif.zhiye.com/campus/jobs
   crawler: beisen
-- name: 三一集团
-  careers_url: https://sany.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 上汽集团
   careers_url: https://saic-recruit.saicmotor.com/
   crawler: render
@@ -1510,12 +1291,9 @@ companies:
   crawler: render
 - name: 中国电科
   careers_url: https://cetc.iguopin.com/job-campus
-  crawler: render
+  crawler: iguopin
 - name: 广域铭岛
   careers_url: https://www.sail-cloud.com/join-us
-  crawler: render
-- name: 当当网
-  careers_url: https://static.dangdang.com/topic/contents/1119/202265.shtml
   crawler: render
 - name: 爱学习
   careers_url: https://aixuexi1.zhiye.com/campus/jobs
@@ -1532,27 +1310,23 @@ companies:
 - name: 马上消费金融
   careers_url: https://weikezhijia.jobs.feishu.cn/s/iMRaH4GB
   crawler: feishu
-- name: 飞鱼科技
-  careers_url: https://app.mokahr.com/m/campus-recruitment/feiyu/142123?recommendCode=DSF2Kc4p&hash=%23%2Fjobs#/jobs
-  crawler: moka
 - name: 金发科技
   careers_url: https://kingfa.zhiye.com/campus/jobs
   crawler: beisen
 - name: 金山办公
   careers_url: https://join.wps.cn/campus-recruitment/wps/41436#/jobs
   crawler: moka
-- name: 赛里斯
-  careers_url: https://sokon.zhiye.com/campus/jobs
-  crawler: beisen
 - name: 高途
   careers_url: https://app.mokahr.com/campus_apply/bjhl
   crawler: moka
 - name: 邦普电脑技术开发
   careers_url: https://www.punp.com/xyzp/index.aspx
   crawler: render
+  link_kind: list
 - name: 远景科技
-  careers_url: https://app.mokahr.com/m/campus_apply/envisiongroup/43123?recommendCode=DS1ayUbm&hash=%23%2Fjobs#/jobs
+  careers_url: https://www.envision-career.com/campus-recruitment/envisiongroup/43123/#/jobs?project%5B0%5D=100124183&page=1&anchorName=jobsList
   crawler: moka
+  campaign_text: 2027届应届生
 - name: 超参数科技
   careers_url: https://hr.chaocanshu.cn/campus_apply/chaocanshu/45562#/
   crawler: render
@@ -1581,8 +1355,9 @@ companies:
   careers_url: https://campus.51job.com/bocom2025/index02.html
   crawler: render
 - name: 大族机器人
-  careers_url: https://www.hansrobot.com/join.html
-  crawler: render
+  careers_url: https://www.huayan-robotics.com/about-us/talent-recruitment?type=60
+  crawler: huayan
+  link_kind: list
 - name: 天马微电子
   careers_url: https://szssmec1.zhiye.com/campus/jobs
   crawler: beisen
@@ -1603,7 +1378,8 @@ companies:
   crawler: static_html
 - name: 芯行纪
   careers_url: https://www.xtimes-da.com/index.php/Mobile?a=page&p=joinus_school
-  crawler: static_html
+  crawler: xtimes
+  link_kind: list
 - name: 盛科通信
   careers_url: https://centec.zhiye.com/campus/jobs
   crawler: beisen
@@ -1616,24 +1392,23 @@ companies:
 - name: 航嘉集团
   careers_url: https://hr.huntkey.com/campus/jobs
   crawler: beisen
-- name: 诺瓦星云
-  careers_url: https://novastar.zhiye.com/campus/jobs
-  crawler: beisen
-- name: 微步在线
-  careers_url: https://app.mokahr.com/m/campus_apply/threatbook/39679?recommendCode=DSUK2sNv#/jobs
-  crawler: moka
-- name: 思特威
-  careers_url: https://app.mokahr.com/campus_apply/smartsenstech1/56088?recommendCode=DS2NEFMs#/jobs
-  crawler: moka
-- name: MiniMax
-  careers_url: https://vrfi1sk8a0.jobs.feishu.cn/s/kGKwaJ_fg7g
-  crawler: feishu
-- name: 同花顺
-  careers_url: https://campus.10jqka.com.cn/job/list?type=school
-  crawler: render
 - name: 学而思
   careers_url: https://app.mokahr.com/campus_apply/tal/148080?recommendCode=DS8pWxXy#/jobs
   crawler: moka
+- name: 柠檬微趣
+  careers_url: https://app.mokahr.com/recommendation-apply/microfunhr/36717
+  crawler: moka
+- name: Dexmal 原力灵机
+  careers_url: https://dexmal-inc.jobs.feishu.cn/s/UcNqTb50zDE
+  crawler: feishu
+- name: 高标科技
+  careers_url: https://kjgb.zhiye.com/campus/jobs?shareId=3cef82ab-bf24-4225-9f23-ee18ced3ce45&shareSource=2
+  crawler: beisen
 deepseek:
-  model: deepseek-v4-flash
-  max_tokens: 3000
+  screening_model: deepseek-v4-flash
+  analysis_model: deepseek-v4-pro
+  screening_max_tokens: 600
+  analysis_max_tokens: 1200
+  max_pro_jobs_per_run: 0
+  max_pro_jobs_per_day: 0
+  max_tokens: 1200

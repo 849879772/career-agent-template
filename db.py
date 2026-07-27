@@ -1,9 +1,11 @@
 import json
 import hashlib
+import os
 import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 DEFAULT_DB_PATH = Path(__file__).parent / "data" / "jobs.db"
 
@@ -127,11 +129,62 @@ def migrate_jd_detail_urls(conn: sqlite3.Connection) -> int:
     return len(updates)
 
 
+def migrate_51job_external_apply_urls(conn: sqlite3.Connection) -> int:
+    """Replace 51job application intermediaries with exact public job pages."""
+    rows = conn.execute(
+        """SELECT id, jd_url FROM jobs
+           WHERE LOWER(jd_url) LIKE 'https://xyz.51job.com/external/apply.aspx?%'"""
+    ).fetchall()
+    updates = []
+    for row in rows:
+        job_ids = parse_qs(urlparse(row["jd_url"]).query).get("jobid") or []
+        if not job_ids or not str(job_ids[0]).isdigit():
+            continue
+        updates.append((
+            f"https://jobs.51job.com/all/{job_ids[0]}.html",
+            row["id"],
+        ))
+    if not updates:
+        return 0
+    conn.executemany(
+        """UPDATE jobs
+           SET jd_url = ?,
+               link_kind = 'detail',
+               jd_status = CASE
+                   WHEN jd_status = 'list_only' THEN 'incomplete'
+                   ELSE jd_status
+               END
+           WHERE id = ?""",
+        updates,
+    )
+    conn.commit()
+    return len(updates)
+
+
+def migrate_bilibili_detail_links(conn: sqlite3.Connection) -> int:
+    """Promote Bilibili's stable position routes from legacy list metadata."""
+    cursor = conn.execute(
+        """UPDATE jobs
+           SET link_kind = 'detail',
+               jd_status = CASE
+                   WHEN LENGTH(TRIM(IFNULL(jd_raw, ''))) >= 120 THEN 'complete'
+                   WHEN jd_status = 'list_only' THEN 'incomplete'
+                   ELSE jd_status
+               END
+           WHERE company = 'bilibili'
+             AND jd_url GLOB 'https://jobs.bilibili.com/campus/positions/[0-9]*'
+             AND link_kind <> 'detail'"""
+    )
+    conn.commit()
+    return cursor.rowcount
+
+
 def init_db(db_path=None) -> sqlite3.Connection:
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
+    conn = sqlite3.connect(str(path), timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 30000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,6 +199,16 @@ def init_db(db_path=None) -> sqlite3.Connection:
             crawled_at   TEXT,
             last_seen_at TEXT,
             link_kind    TEXT DEFAULT 'detail',
+            screening_tier TEXT DEFAULT '',
+            jd_status    TEXT DEFAULT '',
+            jd_checked_at TEXT DEFAULT '',
+            link_status  TEXT DEFAULT '',
+            link_checked_at TEXT DEFAULT '',
+            cohort       INTEGER DEFAULT 0,
+            cohort_status TEXT DEFAULT 'unknown',
+            cohort_source TEXT DEFAULT '',
+            cohort_evidence TEXT DEFAULT '',
+            cohort_checked_at TEXT DEFAULT '',
             is_new       INTEGER DEFAULT 1
         )
     """)
@@ -158,6 +221,14 @@ def init_db(db_path=None) -> sqlite3.Connection:
             gaps           TEXT,
             summary        TEXT,
             recommendation TEXT,
+            score_breakdown TEXT DEFAULT '{}',
+            evidence        TEXT DEFAULT '[]',
+            evidence_level  TEXT DEFAULT '',
+            analysis_status TEXT DEFAULT 'complete',
+            analysis_version TEXT DEFAULT '',
+            jd_fingerprint  TEXT DEFAULT '',
+            profile_fingerprint TEXT DEFAULT '',
+            model           TEXT DEFAULT '',
             analyzed_at    TEXT
         )
     """)
@@ -168,6 +239,8 @@ def init_db(db_path=None) -> sqlite3.Connection:
             title       TEXT,
             city        TEXT,
             relevant    INTEGER NOT NULL,
+            tier        TEXT DEFAULT '',
+            screening_version TEXT DEFAULT '',
             screened_at TEXT
         )
     """)
@@ -181,9 +254,154 @@ def init_db(db_path=None) -> sqlite3.Connection:
     if "link_kind" not in cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN link_kind TEXT DEFAULT 'detail'")
         conn.execute("UPDATE jobs SET link_kind = 'list' WHERE jd_url GLOB '*#[0-9]*' OR jd_url LIKE '%/campus/jobs#%'")
+    if "screening_tier" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN screening_tier TEXT DEFAULT ''")
+    if "jd_status" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN jd_status TEXT DEFAULT ''")
+    if "jd_checked_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN jd_checked_at TEXT DEFAULT ''")
+    if "link_status" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN link_status TEXT DEFAULT ''")
+    if "link_checked_at" not in cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN link_checked_at TEXT DEFAULT ''")
+    cohort_migrations = {
+        "cohort": "INTEGER DEFAULT 0",
+        "cohort_status": "TEXT DEFAULT 'unknown'",
+        "cohort_source": "TEXT DEFAULT ''",
+        "cohort_evidence": "TEXT DEFAULT ''",
+        "cohort_checked_at": "TEXT DEFAULT ''",
+    }
+    for column, definition in cohort_migrations.items():
+        if column not in cols:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+    screening_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(job_screening_cache)").fetchall()
+    }
+    if "tier" not in screening_cols:
+        conn.execute("ALTER TABLE job_screening_cache ADD COLUMN tier TEXT DEFAULT ''")
+    if "screening_version" not in screening_cols:
+        conn.execute(
+            "ALTER TABLE job_screening_cache ADD COLUMN screening_version TEXT DEFAULT ''"
+        )
+    analysis_cols = {
+        row[1] for row in conn.execute("PRAGMA table_info(job_analysis)").fetchall()
+    }
+    analysis_migrations = {
+        "score_breakdown": "TEXT DEFAULT '{}'",
+        "evidence": "TEXT DEFAULT '[]'",
+        "evidence_level": "TEXT DEFAULT ''",
+        "analysis_status": "TEXT DEFAULT 'complete'",
+        "analysis_version": "TEXT DEFAULT ''",
+        "jd_fingerprint": "TEXT DEFAULT ''",
+        "profile_fingerprint": "TEXT DEFAULT ''",
+        "model": "TEXT DEFAULT ''",
+    }
+    for column, definition in analysis_migrations.items():
+        if column not in analysis_cols:
+            conn.execute(f"ALTER TABLE job_analysis ADD COLUMN {column} {definition}")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_company_link_kind "
+        "ON jobs(company, link_kind)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_last_seen "
+        "ON jobs(last_seen_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jobs_cohort "
+        "ON jobs(cohort, cohort_status)"
+    )
     normalize_listing_link_kinds(conn)
+    migrate_51job_external_apply_urls(conn)
+    migrate_bilibili_detail_links(conn)
     conn.commit()
     return conn
+
+
+def update_job_cohort(conn: sqlite3.Connection, job_id: int, job: dict) -> None:
+    """Persist one evidence-based cohort decision."""
+    conn.execute(
+        """UPDATE jobs
+           SET cohort = ?, cohort_status = ?, cohort_source = ?,
+               cohort_evidence = ?, cohort_checked_at = ?,
+               screening_tier = CASE
+                   WHEN ? = 2027 AND ? = 'confirmed' THEN screening_tier
+                   ELSE ''
+               END,
+               jd_status = CASE
+                   WHEN ? = 2027 AND ? = 'confirmed' THEN
+                       CASE WHEN jd_status = 'not_required' THEN 'incomplete' ELSE jd_status END
+                   WHEN jd_status <> 'complete' THEN 'not_required'
+                   ELSE jd_status
+               END
+           WHERE id = ?""",
+        (
+            int(job.get("cohort") or 0),
+            str(job.get("cohort_status") or "unknown"),
+            str(job.get("cohort_source") or ""),
+            str(job.get("cohort_evidence") or "")[:1000],
+            str(job.get("cohort_checked_at") or datetime.now().isoformat(timespec="seconds")),
+            int(job.get("cohort") or 0),
+            str(job.get("cohort_status") or "unknown"),
+            int(job.get("cohort") or 0),
+            str(job.get("cohort_status") or "unknown"),
+            job_id,
+        ),
+    )
+    conn.commit()
+
+
+def backfill_job_cohorts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Classify legacy rows from their existing official job fields."""
+    import job_cohorts
+
+    rows = [dict(row) for row in conn.execute("SELECT * FROM jobs").fetchall()]
+    decisions = []
+    grouped: dict[str, list[dict]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get("company") or ""), []).append(row)
+    for company_rows in grouped.values():
+        decisions.extend(
+            job_cohorts.annotate_company_jobs(
+                company_rows,
+                inspect_page=False,
+            )
+        )
+    counts = {"current": 0, "previous": 0, "unknown": 0}
+    for job in decisions:
+        update_job_cohort(conn, job["id"], job)
+        if job_cohorts.is_confirmed_current(job):
+            counts["current"] += 1
+        elif (
+            job.get("cohort_status") == "confirmed"
+            and int(job.get("cohort") or 0) <= 2026
+        ):
+            counts["previous"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+
+def purge_noncurrent_cohort_analyses(conn: sqlite3.Connection) -> int:
+    """Delete scores lacking confirmed current-cohort evidence."""
+    ids = [
+        row[0]
+        for row in conn.execute(
+            """SELECT analysis.job_id
+               FROM job_analysis AS analysis
+               INNER JOIN jobs AS job ON job.id = analysis.job_id
+               WHERE COALESCE(job.cohort, 0) <> 2027
+                  OR COALESCE(job.cohort_status, '') <> 'confirmed'"""
+        ).fetchall()
+    ]
+    if not ids:
+        return 0
+    conn.executemany(
+        "DELETE FROM job_analysis WHERE job_id = ?",
+        [(job_id,) for job_id in ids],
+    )
+    conn.commit()
+    return len(ids)
 
 
 def mark_listing_links_for_companies(conn: sqlite3.Connection, companies: set[str]) -> int:
@@ -199,7 +417,7 @@ def mark_listing_links_for_companies(conn: sqlite3.Connection, companies: set[st
 
 
 def purge_nonformal_campus_jobs(conn: sqlite3.Connection) -> int:
-    """Remove old internship/social rows that were inserted before stricter filters."""
+    """Remove old internship, early-batch, and social rows plus their analyses."""
     from job_filters import is_formal_campus_job
 
     rows = [dict(row) for row in conn.execute("SELECT * FROM jobs").fetchall()]
@@ -212,11 +430,60 @@ def purge_nonformal_campus_jobs(conn: sqlite3.Connection) -> int:
     return len(ids)
 
 
+def purge_direction_out_jobs(conn: sqlite3.Connection) -> int:
+    """Remove legacy explicit non-target roles and their stale analyses."""
+    from job_filters import is_direction_out_job
+
+    rows = [dict(row) for row in conn.execute("SELECT * FROM jobs").fetchall()]
+    ids = [row["id"] for row in rows if is_direction_out_job(row)]
+    if not ids:
+        return 0
+    conn.executemany("DELETE FROM job_analysis WHERE job_id = ?", [(job_id,) for job_id in ids])
+    conn.executemany("DELETE FROM jobs WHERE id = ?", [(job_id,) for job_id in ids])
+    conn.commit()
+    return len(ids)
+
+
+def purge_jobs_by_ids(conn: sqlite3.Connection, job_ids) -> int:
+    """Remove explicitly verified offline jobs and their analyses."""
+    ids = list(dict.fromkeys(int(job_id) for job_id in job_ids))
+    if not ids:
+        return 0
+    conn.executemany(
+        "DELETE FROM job_analysis WHERE job_id = ?",
+        [(job_id,) for job_id in ids],
+    )
+    deleted = 0
+    for job_id in ids:
+        deleted += conn.execute(
+            "DELETE FROM jobs WHERE id = ?",
+            (job_id,),
+        ).rowcount
+    conn.commit()
+    return deleted
+
+
+def purge_incomplete_jd_analyses(conn: sqlite3.Connection) -> int:
+    """Remove scores that no longer have a substantive JD behind them."""
+    import job_details
+
+    rows = conn.execute(
+        """SELECT job.* FROM jobs AS job
+           INNER JOIN job_analysis AS analysis ON analysis.job_id = job.id"""
+    ).fetchall()
+    ids = [row["id"] for row in rows if job_details.is_jd_incomplete(dict(row))]
+    if not ids:
+        return 0
+    conn.executemany("DELETE FROM job_analysis WHERE job_id = ?", [(job_id,) for job_id in ids])
+    conn.commit()
+    return len(ids)
+
+
 def _job_fingerprint(job: dict) -> str:
     """Stable identity for reusing an AI screening decision across daily crawls."""
     parts = [
         " ".join(str(job.get(field) or "").split()).casefold()
-        for field in ("company", "title", "city")
+        for field in ("company", "title", "city", "jd_raw")
     ]
     return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
 
@@ -235,7 +502,26 @@ def find_job_id(conn: sqlite3.Connection, job: dict) -> int | None:
     return row["id"] if row else None
 
 
+def get_screening_tier(
+    conn: sqlite3.Connection,
+    job: dict,
+    screening_version: str = "target-tier-v2.0",
+) -> str | None:
+    row = conn.execute(
+        """SELECT tier, screening_version FROM job_screening_cache
+           WHERE fingerprint = ?""",
+        (_job_fingerprint(job),),
+    ).fetchone()
+    if not row or row["screening_version"] != screening_version:
+        return None
+    tier = str(row["tier"] or "").strip().upper()
+    return tier if tier in {"A", "B", "C"} else None
+
+
 def get_screening_decision(conn: sqlite3.Connection, job: dict) -> bool | None:
+    tier = get_screening_tier(conn, job)
+    if tier:
+        return tier != "C"
     row = conn.execute(
         "SELECT relevant FROM job_screening_cache WHERE fingerprint = ?",
         (_job_fingerprint(job),),
@@ -246,32 +532,141 @@ def get_screening_decision(conn: sqlite3.Connection, job: dict) -> bool | None:
 def save_screening_decision(
     conn: sqlite3.Connection, job: dict, relevant: bool
 ) -> None:
-    save_screening_decisions(conn, [(job, relevant)])
+    save_screening_tiers(conn, [(job, "A" if relevant else "C")])
 
 
 def save_screening_decisions(
     conn: sqlite3.Connection, decisions: list[tuple[dict, bool]]
 ) -> None:
-    """Persist a screening batch in one transaction for large first runs."""
+    save_screening_tiers(
+        conn,
+        [(job, "A" if relevant else "C") for job, relevant in decisions],
+    )
+
+
+def save_screening_tiers(
+    conn: sqlite3.Connection,
+    decisions: list[tuple[dict, str]],
+    screening_version: str = "target-tier-v2.0",
+) -> None:
+    """Persist tiered screening decisions in one transaction."""
     if not decisions:
         return
     conn.executemany(
         """INSERT OR REPLACE INTO job_screening_cache
-           (fingerprint, company, title, city, relevant, screened_at)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+           (fingerprint, company, title, city, relevant, tier,
+            screening_version, screened_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 _job_fingerprint(job),
                 job.get("company", ""),
                 job.get("title", ""),
                 job.get("city", ""),
-                int(relevant),
+                int(tier != "C"),
+                tier,
+                screening_version,
                 datetime.now().isoformat(),
             )
-            for job, relevant in decisions
+            for job, tier in decisions
         ],
     )
     conn.commit()
+
+
+def update_existing_job_screening_tiers(
+    conn: sqlite3.Connection,
+    decisions: list[tuple[dict, str]],
+) -> int:
+    """Apply fresh tiers to rows already present before this crawl."""
+    updates = []
+    for job, tier in decisions:
+        job_id = find_job_id(conn, job)
+        if job_id is not None:
+            updates.append((tier, job_id))
+    if not updates:
+        return 0
+    conn.executemany(
+        "UPDATE jobs SET screening_tier = ? WHERE id = ?",
+        updates,
+    )
+    conn.commit()
+    return len(updates)
+
+
+def purge_screening_tier_c_jobs(conn: sqlite3.Connection) -> int:
+    """Remove persisted C-tier jobs and any analysis rows tied to them."""
+    ids = [
+        row["id"]
+        for row in conn.execute(
+            "SELECT id FROM jobs WHERE UPPER(TRIM(COALESCE(screening_tier, ''))) = 'C'"
+        ).fetchall()
+    ]
+    if not ids:
+        return 0
+    conn.executemany(
+        "DELETE FROM job_analysis WHERE job_id = ?",
+        [(job_id,) for job_id in ids],
+    )
+    conn.executemany(
+        "DELETE FROM jobs WHERE id = ?",
+        [(job_id,) for job_id in ids],
+    )
+    conn.commit()
+    return len(ids)
+
+
+def purge_screening_tier_b_analyses(conn: sqlite3.Connection) -> int:
+    """Remove stale Pro scores from B-tier jobs while preserving the jobs."""
+    import analyzer
+
+    ids = [
+        row["id"]
+        for row in conn.execute(
+            """SELECT job.*
+               FROM jobs AS job
+               INNER JOIN job_analysis AS analysis ON analysis.job_id = job.id
+               WHERE UPPER(TRIM(COALESCE(job.screening_tier, ''))) = 'B'"""
+        ).fetchall()
+        if analyzer.analysis_screening_tier(dict(row)) == "B"
+    ]
+    if not ids:
+        return 0
+    conn.executemany(
+        "DELETE FROM job_analysis WHERE job_id = ?",
+        [(job_id,) for job_id in ids],
+    )
+    conn.commit()
+    return len(ids)
+
+
+def _resolve_jd_status(
+    title: str,
+    jd_raw: str,
+    link_kind: str,
+    *,
+    requested_status: str = "",
+    current_status: str = "",
+) -> str:
+    """Derive a durable JD state without losing a prior verification result."""
+    import job_details
+
+    if not job_details.is_jd_incomplete({"title": title, "jd_raw": jd_raw}):
+        return "complete"
+    if link_kind == "list":
+        return "list_only"
+    requested = str(requested_status or "").strip()
+    if requested:
+        return requested
+    current = str(current_status or "").strip()
+    if current in {
+        "official_unavailable",
+        "official_sparse",
+        "access_blocked",
+        "fetch_failed",
+    }:
+        return current
+    return "incomplete"
 
 
 def upsert_job(conn: sqlite3.Connection, job: dict) -> tuple[bool, int]:
@@ -288,67 +683,175 @@ def upsert_job(conn: sqlite3.Connection, job: dict) -> tuple[bool, int]:
     """
     today = date.today().isoformat()
 
+    def persist_cohort(job_id: int) -> None:
+        if "cohort_status" in job:
+            update_job_cohort(conn, job_id, job)
+
     # 1. 按 jd_url 找
     row = conn.execute(
-        "SELECT id FROM jobs WHERE jd_url = ?", (job["jd_url"],)
+        "SELECT id, title, jd_raw, link_kind, jd_status FROM jobs WHERE jd_url = ?",
+        (job["jd_url"],),
     ).fetchone()
     if row:
+        incoming_jd = str(job.get("jd_raw") or "")
+        stored_jd = str(row["jd_raw"] or "")
+        richer_jd = incoming_jd if len(incoming_jd.strip()) >= len(stored_jd.strip()) else stored_jd
+        link_kind = job.get("link_kind", "detail")
+        jd_status = _resolve_jd_status(
+            job.get("title") or row["title"],
+            richer_jd,
+            link_kind,
+            requested_status=job.get("jd_status", ""),
+            current_status=row["jd_status"],
+        )
         conn.execute(
             """UPDATE jobs
-               SET city = ?, job_type = ?, jd_raw = CASE WHEN ? <> '' THEN ? ELSE jd_raw END,
+               SET city = ?, job_type = ?, jd_raw = ?,
                    published_at = CASE WHEN ? <> '' THEN ? ELSE published_at END,
-                   source = ?, last_seen_at = ?, link_kind = ?
+                   source = ?, last_seen_at = ?, link_kind = ?,
+                   screening_tier = CASE WHEN ? <> '' THEN ? ELSE screening_tier END,
+                   jd_status = ?,
+                   jd_checked_at = CASE WHEN ? = 'complete' THEN ? ELSE jd_checked_at END
                WHERE id = ?""",
             (
-                job.get("city", ""), job.get("job_type", "校招"), job.get("jd_raw", ""), job.get("jd_raw", ""),
+                job.get("city", ""), job.get("job_type", "校招"), richer_jd,
                 job.get("published_at", ""), job.get("published_at", ""), job.get("source", job["company"]),
-                today, job.get("link_kind", "detail"), row["id"],
+                today, link_kind,
+                job.get("screening_tier", ""), job.get("screening_tier", ""),
+                jd_status, jd_status, datetime.now().isoformat(timespec="seconds"),
+                row["id"],
             ),
         )
         conn.commit()
+        persist_cohort(row["id"])
+        return False, row["id"]
+
+    # A crawler upgrade can replace one legacy list card (often missing city)
+    # with a concrete detail record. Upgrade the row only when the company and
+    # title identify exactly one record, preserving true multi-city positions.
+    legacy_rows = conn.execute(
+        """SELECT id, title, jd_raw, link_kind, jd_status FROM jobs
+           WHERE company = ? AND title = ? AND link_kind = 'list'""",
+        (job["company"], job["title"]),
+    ).fetchall()
+    same_title_count = conn.execute(
+        "SELECT COUNT(*) FROM jobs WHERE company = ? AND title = ?",
+        (job["company"], job["title"]),
+    ).fetchone()[0]
+    if len(legacy_rows) == 1 and same_title_count == 1:
+        row = legacy_rows[0]
+        incoming_jd = str(job.get("jd_raw") or "")
+        stored_jd = str(row["jd_raw"] or "")
+        richer_jd = (
+            incoming_jd
+            if len(incoming_jd.strip()) >= len(stored_jd.strip())
+            else stored_jd
+        )
+        link_kind = job.get("link_kind", "detail")
+        jd_status = _resolve_jd_status(
+            job.get("title") or row["title"],
+            richer_jd,
+            link_kind,
+            requested_status=job.get("jd_status", ""),
+            current_status=row["jd_status"],
+        )
+        conn.execute(
+            """UPDATE jobs
+               SET jd_url = ?, city = ?, job_type = ?, jd_raw = ?,
+                   published_at = CASE WHEN ? <> '' THEN ? ELSE published_at END,
+                   source = ?, last_seen_at = ?, link_kind = ?,
+                   screening_tier = CASE WHEN ? <> '' THEN ? ELSE screening_tier END,
+                   jd_status = ?,
+                   jd_checked_at = CASE WHEN ? = 'complete' THEN ? ELSE jd_checked_at END
+               WHERE id = ?""",
+            (
+                job["jd_url"], job.get("city", ""), job.get("job_type", "校招"),
+                richer_jd, job.get("published_at", ""), job.get("published_at", ""),
+                job.get("source", job["company"]), today, link_kind,
+                job.get("screening_tier", ""), job.get("screening_tier", ""),
+                jd_status, jd_status, datetime.now().isoformat(timespec="seconds"),
+                row["id"],
+            ),
+        )
+        conn.commit()
+        persist_cohort(row["id"])
         return False, row["id"]
 
     # 2. 按 (company, title, city) 找（URL 格式变更时仍能识别为同一岗位；
     #    带 city 避免把同公司同名但多城市的不同岗位错误合并成一行）
     row = conn.execute(
-        "SELECT id FROM jobs WHERE company = ? AND title = ? AND IFNULL(city, '') = ?",
+        """SELECT id, title, jd_raw, link_kind, jd_status FROM jobs
+           WHERE company = ? AND title = ? AND IFNULL(city, '') = ?""",
         (job["company"], job["title"], job.get("city") or ""),
     ).fetchone()
     if row:
+        incoming_jd = str(job.get("jd_raw") or "")
+        stored_jd = str(row["jd_raw"] or "")
+        richer_jd = incoming_jd if len(incoming_jd.strip()) >= len(stored_jd.strip()) else stored_jd
+        link_kind = job.get("link_kind", "detail")
+        jd_status = _resolve_jd_status(
+            job.get("title") or row["title"],
+            richer_jd,
+            link_kind,
+            requested_status=job.get("jd_status", ""),
+            current_status=row["jd_status"],
+        )
         try:
             conn.execute(
                 """UPDATE jobs
-                   SET jd_url = ?, city = ?, job_type = ?, jd_raw = CASE WHEN ? <> '' THEN ? ELSE jd_raw END,
+                   SET jd_url = ?, city = ?, job_type = ?, jd_raw = ?,
                        published_at = CASE WHEN ? <> '' THEN ? ELSE published_at END,
-                       source = ?, last_seen_at = ?, link_kind = ?
+                       source = ?, last_seen_at = ?, link_kind = ?,
+                       screening_tier = CASE WHEN ? <> '' THEN ? ELSE screening_tier END,
+                       jd_status = ?,
+                       jd_checked_at = CASE WHEN ? = 'complete' THEN ? ELSE jd_checked_at END
                    WHERE id = ?""",
                 (
                     job["jd_url"], job.get("city", ""), job.get("job_type", "校招"),
-                    job.get("jd_raw", ""), job.get("jd_raw", ""), job.get("published_at", ""),
+                    richer_jd, job.get("published_at", ""),
                     job.get("published_at", ""), job.get("source", job["company"]),
-                    today, job.get("link_kind", "detail"), row["id"],
+                    today, link_kind,
+                    job.get("screening_tier", ""), job.get("screening_tier", ""),
+                    jd_status, jd_status, datetime.now().isoformat(timespec="seconds"),
+                    row["id"],
                 ),
             )
             conn.commit()
+            persist_cohort(row["id"])
             return False, row["id"]
         except sqlite3.IntegrityError:
             # 新 jd_url 跟另一行冲突（罕见，例如重命名碰撞）→ 回落到 INSERT 路径
             pass
 
     # 3. INSERT
+    link_kind = job.get("link_kind", "detail")
+    jd_status = _resolve_jd_status(
+        job.get("title", ""),
+        job.get("jd_raw", ""),
+        link_kind,
+        requested_status=job.get("jd_status", ""),
+    )
+    jd_checked_at = (
+        datetime.now().isoformat(timespec="seconds")
+        if jd_status == "complete"
+        else ""
+    )
     try:
         cursor = conn.execute(
             """INSERT INTO jobs
                (company, title, city, job_type, jd_url, jd_raw, published_at, source,
-                crawled_at, last_seen_at, link_kind)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                crawled_at, last_seen_at, link_kind, screening_tier, jd_status,
+                jd_checked_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 job["company"], job["title"], job["city"], job["job_type"],
                 job["jd_url"], job["jd_raw"], job["published_at"], job["source"],
-                today, today, job.get("link_kind", "detail"),
+                today, today, link_kind, job.get("screening_tier", ""),
+                jd_status, jd_checked_at,
             ),
         )
         conn.commit()
+        persist_cohort(cursor.lastrowid)
         return True, cursor.lastrowid
     except sqlite3.IntegrityError:
         # 并发或竞态：jd_url 此时已存在 → 当作刷新
@@ -360,11 +863,111 @@ def upsert_job(conn: sqlite3.Connection, job: dict) -> tuple[bool, int]:
             "SELECT id FROM jobs WHERE jd_url = ?", (job["jd_url"],)
         ).fetchone()
         conn.commit()
+        persist_cohort(row["id"])
         return False, row["id"]
 
 
 # 向后兼容别名（旧代码/测试用）
 insert_job = upsert_job
+
+
+def update_job_jd(
+    conn: sqlite3.Connection,
+    job_id: int,
+    jd_raw: str,
+    jd_url: str | None = None,
+    link_kind: str | None = None,
+) -> bool:
+    """Persist a verified rendered detail when its normalized text changed."""
+    text = str(jd_raw or "").strip()
+    if not text:
+        return False
+    current = conn.execute(
+        "SELECT title, jd_raw, jd_url, link_kind FROM jobs WHERE id = ?",
+        (job_id,),
+    ).fetchone()
+    if current is None:
+        return False
+
+    # Platform refresh APIs occasionally return only a short card summary for
+    # a job whose full JD is already stored. Never let that downgrade a
+    # complete record. For two incomplete payloads, retain the richer text.
+    import job_details
+
+    current_job = {
+        "title": current["title"],
+        "jd_raw": current["jd_raw"],
+    }
+    incoming_job = {
+        "title": current["title"],
+        "jd_raw": text,
+    }
+    current_incomplete = job_details.is_jd_incomplete(current_job)
+    incoming_incomplete = job_details.is_jd_incomplete(incoming_job)
+    if not current_incomplete and incoming_incomplete:
+        text = str(current["jd_raw"] or "").strip()
+    elif current_incomplete and incoming_incomplete:
+        current_text = str(current["jd_raw"] or "").strip()
+        if len(current_text) > len(text):
+            text = current_text
+
+    cursor = conn.execute(
+        """UPDATE jobs
+           SET jd_raw = ?,
+               jd_url = COALESCE(NULLIF(?, ''), jd_url),
+               link_kind = COALESCE(NULLIF(?, ''), link_kind),
+               jd_status = ?,
+               jd_checked_at = ?
+           WHERE id = ?
+             AND (
+                 TRIM(?) <> TRIM(COALESCE(jd_raw, ''))
+                 OR COALESCE(NULLIF(?, ''), jd_url) <> jd_url
+                 OR COALESCE(NULLIF(?, ''), link_kind) <> link_kind
+             )""",
+        (
+            text, jd_url, link_kind,
+            "incomplete" if job_details.is_jd_incomplete(
+                {"title": current["title"], "jd_raw": text}
+            ) else "complete",
+            datetime.now().isoformat(timespec="seconds"),
+            job_id, text, jd_url, link_kind,
+        ),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+def mark_job_jd_status(
+    conn: sqlite3.Connection,
+    job_id: int,
+    status: str,
+) -> None:
+    """Persist the latest JD verification outcome without changing job text."""
+    conn.execute(
+        """UPDATE jobs
+           SET jd_status = ?, jd_checked_at = ?
+           WHERE id = ?""",
+        (status, datetime.now().isoformat(timespec="seconds"), job_id),
+    )
+    conn.commit()
+
+
+def update_job_link_statuses(
+    conn: sqlite3.Connection,
+    statuses: list[tuple[int, str]],
+) -> int:
+    """Persist link-audit verdicts separately from JD completeness."""
+    if not statuses:
+        return 0
+    checked_at = datetime.now().isoformat(timespec="seconds")
+    conn.executemany(
+        """UPDATE jobs
+           SET link_status = ?, link_checked_at = ?
+           WHERE id = ?""",
+        [(status, checked_at, job_id) for job_id, status in statuses],
+    )
+    conn.commit()
+    return len(statuses)
 
 
 def get_active_jobs(conn: sqlite3.Connection) -> list[dict]:
@@ -377,16 +980,8 @@ def get_active_jobs(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """SELECT * FROM jobs AS job
            WHERE job.last_seen_at >= ?
-             AND (
-                 job.link_kind <> 'list'
-                 OR NOT EXISTS (
-                     SELECT 1 FROM jobs AS detail
-                     WHERE detail.company = job.company
-                       AND detail.last_seen_at >= ?
-                       AND detail.link_kind <> 'list'
-                 )
-             )""",
-        (cutoff, cutoff),
+             AND COALESCE(job.screening_tier, '') <> 'C'""",
+        (cutoff,),
     ).fetchall()
     return [dict(row) for row in rows]
 
@@ -413,25 +1008,24 @@ def get_new_jobs_today(conn: sqlite3.Connection) -> list[dict]:
 
 
 def get_disappeared_jobs(
-    conn: sqlite3.Connection, successful_companies: set
+    conn: sqlite3.Connection,
+    successful_companies: set,
+    scan_date: str | None = None,
 ) -> list[dict]:
-    """本次扫描中"下线"的岗位：在上一次成功扫到该公司时还存在，但今天没扫到。
+    """Return jobs seen yesterday but absent from today's successful crawl.
 
-    只考虑本次成功爬取（successful_companies）的公司，避免把爬虫故障误判为下线。
+    Restricting the comparison to yesterday prevents an old successful batch
+    from being reported as newly disappeared every day. Companies that did not
+    return any jobs today are excluded to avoid treating crawler failures as
+    removals.
     """
-    today = date.today().isoformat()
+    today = date.fromisoformat(scan_date) if scan_date else date.today()
+    previous_day = (today - timedelta(days=1)).isoformat()
     disappeared = []
     for company in successful_companies:
-        prev = conn.execute(
-            """SELECT MAX(last_seen_at) AS prev
-               FROM jobs WHERE company = ? AND last_seen_at < ?""",
-            (company, today),
-        ).fetchone()
-        if not prev or not prev["prev"]:
-            continue
         rows = conn.execute(
             "SELECT * FROM jobs WHERE company = ? AND last_seen_at = ?",
-            (company, prev["prev"]),
+            (company, previous_day),
         ).fetchall()
         disappeared.extend(dict(row) for row in rows)
     return disappeared
@@ -440,8 +1034,10 @@ def get_disappeared_jobs(
 def save_analysis(conn: sqlite3.Connection, job_id: int, analysis: dict) -> None:
     conn.execute(
         """INSERT OR REPLACE INTO job_analysis
-           (job_id, match_score, advantages, gaps, summary, recommendation, analyzed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           (job_id, match_score, advantages, gaps, summary, recommendation,
+            score_breakdown, evidence, evidence_level, analysis_status,
+            analysis_version, jd_fingerprint, profile_fingerprint, model, analyzed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             job_id,
             analysis["match_score"],
@@ -449,6 +1045,14 @@ def save_analysis(conn: sqlite3.Connection, job_id: int, analysis: dict) -> None
             json.dumps(analysis["gaps"], ensure_ascii=False),
             analysis["summary"],
             analysis["recommendation"],
+            json.dumps(analysis.get("score_breakdown", {}), ensure_ascii=False),
+            json.dumps(analysis.get("evidence", []), ensure_ascii=False),
+            analysis.get("evidence_level", ""),
+            analysis.get("analysis_status", "complete"),
+            analysis.get("analysis_version", ""),
+            analysis.get("jd_fingerprint", ""),
+            analysis.get("profile_fingerprint", ""),
+            analysis.get("model", ""),
             datetime.now().isoformat(),
         ),
     )
@@ -462,16 +1066,57 @@ def has_analysis(conn: sqlite3.Connection, job_id: int) -> bool:
     return row is not None
 
 
+def analysis_is_current(
+    conn: sqlite3.Connection,
+    job_id: int,
+    analysis_version: str,
+    jd_fingerprint: str,
+    profile_fingerprint: str,
+    model: str,
+) -> bool:
+    row = conn.execute(
+        """SELECT analysis_version, jd_fingerprint, profile_fingerprint, model,
+                  analysis_status
+           FROM job_analysis WHERE job_id = ?""",
+        (job_id,),
+    ).fetchone()
+    if not row or row["analysis_status"] != "complete":
+        return False
+    return (
+        row["analysis_version"] == analysis_version
+        and row["jd_fingerprint"] == jd_fingerprint
+        and row["profile_fingerprint"] == profile_fingerprint
+        and row["model"] == model
+    )
+
+
 def _join_analysis(conn: sqlite3.Connection, jobs: list[dict]) -> dict:
+    if not jobs:
+        return {"items": []}
+
+    # Fetch analyses in bounded batches instead of issuing one query per job.
+    # A full local report currently contains thousands of jobs, so the old
+    # N+1 query pattern dominated page startup time.
+    analysis_by_job = {}
+    job_ids = [job["id"] for job in jobs]
+    batch_size = 900  # Stay below SQLite's common host-parameter limit.
+    for offset in range(0, len(job_ids), batch_size):
+        batch = job_ids[offset:offset + batch_size]
+        placeholders = ",".join("?" for _ in batch)
+        rows = conn.execute(
+            f"SELECT * FROM job_analysis WHERE job_id IN ({placeholders})",
+            batch,
+        ).fetchall()
+        analysis_by_job.update({row["job_id"]: dict(row) for row in rows})
+
     items = []
     for job in jobs:
-        analysis_row = conn.execute(
-            "SELECT * FROM job_analysis WHERE job_id = ?", (job["id"],)
-        ).fetchone()
-        if analysis_row:
-            analysis = dict(analysis_row)
+        analysis = analysis_by_job.get(job["id"])
+        if analysis:
             analysis["advantages"] = json.loads(analysis["advantages"] or "[]")
             analysis["gaps"] = json.loads(analysis["gaps"] or "[]")
+            analysis["score_breakdown"] = json.loads(analysis.get("score_breakdown") or "{}")
+            analysis["evidence"] = json.loads(analysis.get("evidence") or "[]")
         else:
             analysis = None
         items.append({"job": job, "analysis": analysis})
@@ -487,18 +1132,20 @@ def get_active_report_data(conn: sqlite3.Connection) -> dict:
 
 
 def get_all_jobs_with_analysis(conn: sqlite3.Connection) -> list[dict]:
-    """所有 DB 岗位 + 各自分析（已 join），用于飞书 '全部追踪' 推送。"""
-    rows = conn.execute(
-        """SELECT * FROM jobs AS job
-           WHERE job.link_kind <> 'list'
-              OR NOT EXISTS (
-                  SELECT 1 FROM jobs AS detail
-                  WHERE detail.company = job.company
-                    AND detail.link_kind <> 'list'
-              )
-           ORDER BY job.id"""
-    ).fetchall()
-    return _join_analysis(conn, [dict(r) for r in rows])["items"]
+    """当前活跃岗位及分析，用于累计主页和飞书“全部追踪”。
+
+    历史岗位继续保存在 SQLite 中，但不会因为旧分析仍存在而永久显示。
+    活跃窗口同时为单次 crawler 网络故障保留缓冲。
+    """
+    return _join_analysis(conn, get_active_jobs(conn))["items"]
+
+
+def get_job_with_analysis(conn: sqlite3.Connection, job_id: int) -> dict | None:
+    """Return one job and its analysis for local integrations."""
+    row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+    if not row:
+        return None
+    return _join_analysis(conn, [dict(row)])["items"][0]
 
 
 def get_today_report_data(conn: sqlite3.Connection, date_str: str) -> dict:
@@ -520,7 +1167,9 @@ def get_today_report_data(conn: sqlite3.Connection, date_str: str) -> dict:
 # 旧调用方，但 conn 不再使用（投递不进 jobs.db）。
 # ──────────────────────────────────────────────────────────────────────────
 
-APPLICATIONS_PATH = Path(__file__).parent / "data" / "applications.json"
+APPLICATIONS_PATH = Path(
+    os.environ.get("APPLICATIONS_PATH", Path(__file__).parent / "data" / "applications.json")
+)
 
 
 def _load_apps() -> list[dict]:

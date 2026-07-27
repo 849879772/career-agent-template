@@ -17,6 +17,8 @@ MOCK_DATA = {
                 "city": "杭州",
                 "jd_url": "https://www.unitree.com/jobs/visual",
                 "job_type": "校招",
+                "cohort": 2027,
+                "cohort_status": "confirmed",
                 "crawled_at": "2026-05-13",
             },
             "analysis": {
@@ -35,6 +37,8 @@ MOCK_DATA = {
                 "city": "深圳",
                 "jd_url": "https://www.unitree.com/jobs/embedded",
                 "job_type": "校招",
+                "cohort": 2027,
+                "cohort_status": "confirmed",
                 "crawled_at": "2026-05-13",
             },
             "analysis": {
@@ -53,6 +57,8 @@ MOCK_DATA = {
                 "city": "杭州",
                 "jd_url": "https://www.unitree.com/jobs/arm",
                 "job_type": "校招",
+                "cohort": 2027,
+                "cohort_status": "confirmed",
                 "crawled_at": "2026-05-13",
             },
             "analysis": {
@@ -71,6 +77,77 @@ def test_generate_report_creates_file(tmp_path):
     path = reporter.generate_report("2026-05-13", MOCK_DATA, reports_dir=str(tmp_path))
     assert os.path.exists(path)
     assert path.endswith(".html")
+
+
+def test_local_report_uses_server_pagination_without_embedding_all_jobs():
+    content = reporter.render_html(
+        "2026-05-13",
+        MOCK_DATA,
+        editable=True,
+        server_pagination=True,
+    )
+
+    assert "window.__SERVER_PAGINATION = true" in content
+    assert "window.__JOBS = []" in content
+    assert "window.__COMPANY_SUMMARIES" in content
+    assert 'id="ppPrev"' in content
+
+
+def test_company_ranking_is_split_by_cohort():
+    data = {
+        "date": "2026-05-13",
+        "items": [
+            *MOCK_DATA["items"],
+            {
+                "job": {
+                    "id": 10,
+                    "company": "往届公司",
+                    "title": "C++开发工程师（2026届）",
+                    "city": "北京",
+                    "jd_url": "https://example.com/previous",
+                    "job_type": "校招",
+                    "cohort": 2026,
+                    "cohort_status": "confirmed",
+                },
+                "analysis": None,
+            },
+            {
+                "job": {
+                    "id": 11,
+                    "company": "待确认公司",
+                    "title": "机器人软件工程师",
+                    "city": "上海",
+                    "jd_url": "https://example.com/unknown",
+                    "job_type": "校招",
+                    "cohort": None,
+                    "cohort_status": "unknown",
+                },
+                "analysis": None,
+            },
+        ],
+    }
+
+    content = reporter.render_html(
+        "2026-05-13", data, editable=True, server_pagination=True
+    )
+
+    for cohort, label in (
+        ("current", "27届"),
+        ("previous", "往届"),
+        ("unknown", "届别待确认"),
+    ):
+        assert f'data-company-cohort="{cohort}"' in content
+        assert label in content
+    assert '"previous":' in content
+    assert '"unknown":' in content
+    assert "cohort: companyCohort" in content
+
+
+def test_report_contains_configured_company_campus_links(tmp_path):
+    path = reporter.generate_report("2026-05-13", MOCK_DATA, reports_dir=str(tmp_path))
+    html = Path(path).read_text(encoding="utf-8")
+    assert "window.__COMPANY_CAREERS" in html
+    assert "company-campus-link" in html
 
 
 def test_intern_filter_does_not_match_international():
@@ -151,7 +228,7 @@ def test_report_has_expected_pages(tmp_path):
     """重构后应有 5 个页面：总体岗位/今日新增/公司排行/投递记录/日程安排。"""
     path = reporter.generate_report("2026-05-13", MOCK_DATA, reports_dir=str(tmp_path))
     content = Path(path).read_text(encoding="utf-8")
-    for slug in ("recommended", "today", "companies", "previous-cohort", "applications", "schedule"):
+    for slug in ("recommended", "today", "companies", "previous-cohort", "unknown-cohort", "applications", "schedule"):
         assert f'data-page="{slug}"' in content
         assert f'data-target="{slug}"' in content
     # 已砍掉的占位页不应再出现
@@ -174,10 +251,32 @@ def test_report_moves_explicit_2026_jobs_to_previous_cohort(tmp_path):
         ]
     }
     content = Path(reporter.generate_report("2026-05-13", data, reports_dir=str(tmp_path))).read_text(encoding="utf-8")
-    current, previous, _ = reporter._filter_items(data["items"])
+    current, previous, unknown, _ = reporter._filter_items(data["items"])
     assert [item["job"]["title"] for item in current] == ["27届算法工程师"]
     assert [item["job"]["title"] for item in previous] == ["26届春招-C++开发工程师"]
+    assert unknown == []
     assert 'data-page="previous-cohort"' in content
+
+
+def test_report_hides_internship_and_early_batch_rows():
+    data = {
+        "items": [
+            {"job": {"company": "甲", "title": "算法工程师", "job_type": "校招 正式",
+                     "jd_url": "https://example.com/formal", "jd_raw": ""},
+             "analysis": {"match_score": 80}},
+            {"job": {"company": "乙", "title": "算法工程师", "job_type": "校招",
+                     "jd_url": "https://example.com/intern", "jd_raw": "校招 实习 | 上海"},
+             "analysis": {"match_score": 80}},
+            {"job": {"company": "丙", "title": "27届提前批-C++工程师", "job_type": "校招",
+                     "jd_url": "https://example.com/early", "jd_raw": ""},
+             "analysis": {"match_score": 80}},
+        ]
+    }
+    current, previous, unknown, hidden = reporter._filter_items(data["items"])
+    assert current == []
+    assert previous == []
+    assert [item["job"]["company"] for item in unknown] == ["甲"]
+    assert hidden == 2
 
 
 def test_previous_cohort_sorts_by_match_score_descending():
@@ -191,15 +290,35 @@ def test_previous_cohort_sorts_by_match_score_descending():
     assert html.index("高分") < html.index("低分")
 
 
+def test_report_has_cohort_search_and_company_detail_links(tmp_path):
+    data = {**MOCK_DATA, "items": [
+        *MOCK_DATA["items"],
+        {
+            "job": {"id": 99, "company": "往届公司", "title": "26届软件工程师", "city": "北京",
+                    "jd_url": "https://example.com/previous", "job_type": "校招", "jd_raw": ""},
+            "analysis": {"match_score": 70, "advantages": [], "gaps": [],
+                         "summary": "", "recommendation": "推荐"},
+        },
+    ]}
+    content = Path(reporter.generate_report("2026-05-13", data, reports_dir=str(tmp_path))).read_text(encoding="utf-8")
+    assert 'id="jobSearch"' in content
+    assert 'id="previousSearch"' in content
+    assert 'data-company-link=' in content
+    assert "window.__PREVIOUS_JOBS" in content
+    assert "window.openCompany" in content
+
+
 def test_report_labels_listing_link_instead_of_detail_apply_link(tmp_path):
     data = {"items": [{
-        "job": {"id": 1, "company": "甲", "title": "算法工程师", "city": "北京",
-                "jd_url": "https://example.com/campus/jobs#1", "job_type": "校招", "jd_raw": "", "link_kind": "list"},
+            "job": {"id": 1, "company": "甲", "title": "算法工程师", "city": "北京",
+                    "jd_url": "https://example.com/campus/jobs#1", "job_type": "校招",
+                    "cohort": 2027, "cohort_status": "confirmed",
+                    "jd_raw": "", "link_kind": "list"},
         "analysis": {"match_score": 80, "advantages": [], "gaps": [], "summary": "", "recommendation": "推荐"},
     }]}
     content = Path(reporter.generate_report("2026-05-13", data, reports_dir=str(tmp_path))).read_text(encoding="utf-8")
     assert "仅提供招聘列表" in content
-    assert "打开招聘列表" in content
+    assert "无公开岗位详情页" in content
 
 
 def test_report_today_page_shows_today_jobs(tmp_path):

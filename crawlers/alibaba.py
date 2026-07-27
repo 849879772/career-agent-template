@@ -16,7 +16,7 @@ class AlibabaCrawler(BaseCrawler):
     DEFAULT_BATCH_ID = 100000540002
     PAGE_SIZE = 50
     MAX_PAGES = 20
-    JD_RAW_LIMIT = 1000
+    JD_RAW_LIMIT = 12000
 
     def _origin(self) -> str:
         host = urlparse(self.careers_url).netloc or self.DEFAULT_HOST
@@ -109,8 +109,10 @@ class AlibabaCrawler(BaseCrawler):
                         continue
                     seen.add(job_id)
                     city = " / ".join(item.get("workLocations") or [])
+                    duties = str(item.get("description") or "").strip()
+                    requirements = str(item.get("requirement") or "").strip()
                     jd_raw = "\n".join(
-                        x for x in [item.get("description") or "", item.get("requirement") or ""] if x
+                        x for x in ["岗位职责", duties, "任职要求", requirements] if x
                     )
                     jobs.append(self._make_job(
                         title=title,

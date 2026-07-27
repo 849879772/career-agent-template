@@ -23,7 +23,7 @@ class KuaishouCrawler(BaseCrawler):
     DETAIL = "https://campus.kuaishou.cn/recruit/campus/e/?#/campus/jobDetail/"
     PAGE_SIZE = 100
     MAX_PAGES = 15
-    JD_RAW_LIMIT = 300
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -60,7 +60,14 @@ class KuaishouCrawler(BaseCrawler):
                 city = "、".join(
                     d.get("name", "") for d in (x.get("workLocationDicts") or []) if d.get("name")
                 )[:40]
-                jd_raw = (x.get("description") or x.get("positionDemand") or "")[:self.JD_RAW_LIMIT]
+                duties = str(x.get("description") or "").strip()
+                requirements = str(x.get("positionDemand") or "").strip()
+                jd_parts = []
+                if duties:
+                    jd_parts.extend(["岗位职责", duties])
+                if requirements:
+                    jd_parts.extend(["任职要求", requirements])
+                jd_raw = "\n".join(jd_parts)[:self.JD_RAW_LIMIT]
                 jobs.append(self._make_job(title=title, city=city,
                                            jd_url=f"{self.DETAIL}{code}", jd_raw=jd_raw))
             if page >= (result.get("pages") or 0):

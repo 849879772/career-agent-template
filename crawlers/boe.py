@@ -12,7 +12,7 @@ class BOECrawler(BaseCrawler):
     API = "https://campus.boe.com/api/Jobad/GetJobAdPageList"
     PAGE_SIZE = 50
     MAX_PAGES = 20
-    JD_RAW_LIMIT = 500
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -41,8 +41,10 @@ class BOECrawler(BaseCrawler):
                     continue
                 seen.add(jid)
                 city = "、".join(item.get("LocNames") or [])[:40]
+                duties = str(item.get("Duty") or "").strip()
+                requirements = str(item.get("Require") or "").strip()
                 jd_raw = "\n".join(
-                    x for x in [item.get("Duty") or "", item.get("Require") or ""] if x
+                    x for x in ["岗位职责", duties, "任职要求", requirements] if x
                 )[: self.JD_RAW_LIMIT]
                 jobs.append(
                     self._make_job(

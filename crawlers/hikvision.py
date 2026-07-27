@@ -20,7 +20,7 @@ class HikvisionCrawler(BaseCrawler):
     API = "https://campushr.hikvision.com/api/search/crsPositionSearch/getPositionByQuery"
     PAGE_SIZE = 50
     MAX_PAGES = 20
-    JD_RAW_LIMIT = 300
+    JD_RAW_LIMIT = 12000
     JOB_NATURE = "应届生"  # 只要正式校招，不要实习生（站点按 jobNature 分）
 
     def fetch(self) -> list[dict]:
@@ -47,7 +47,11 @@ class HikvisionCrawler(BaseCrawler):
                     continue
                 seen.add(jid)
                 city = (x.get("workPlace") or x.get("addr") or "")[:40]
-                jd_raw = (x.get("postContent") or x.get("postRequire") or "")[:self.JD_RAW_LIMIT]
+                duties = str(x.get("postContent") or "").strip()
+                requirements = str(x.get("postRequire") or "").strip()
+                jd_raw = "\n".join(
+                    part for part in ["岗位职责", duties, "任职要求", requirements] if part
+                )[:self.JD_RAW_LIMIT]
                 jd_url = f"https://campushr.hikvision.com/school?positionId={jid}"
                 jobs.append(self._make_job(title=title, city=city, jd_url=jd_url, jd_raw=jd_raw))
             if not data.get("hasNextPage"):

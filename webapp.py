@@ -19,25 +19,72 @@ import webbrowser
 from datetime import date, datetime
 from pathlib import Path
 
-from flask import Flask, redirect, request
+from flask import Flask, jsonify, redirect, request
 
 import db as db_module
 import reporter
 
 _ROOT = Path(__file__).parent
 DB_PATH = str(_ROOT / "data" / "jobs.db")
-_PORT = 5000
+_PORT = int(os.environ.get("WEBAPP_PORT", "5000"))
+_BUILD_ID = "company-cohort-ranking-v3"
 
 # 自动把投递记录推到远端（让手机端的报告同步）。设 WEBAPP_AUTO_SYNC=0 关闭。
 _AUTO_SYNC = os.environ.get("WEBAPP_AUTO_SYNC", "1") != "0"
 _APPS_REL = "data/applications.json"
 _sync_lock = threading.Lock()
+_page_cache_lock = threading.RLock()
+_page_cache = {"signature": None, "snapshot": None, "html": None}
 
 app = Flask(__name__)
 
 
 def _conn():
     return db_module.init_db(DB_PATH)
+
+
+def _data_signature():
+    """Return a cheap cache key that changes whenever report state changes."""
+    paths = (Path(DB_PATH), db_module.APPLICATIONS_PATH)
+    signature = [date.today().isoformat()]
+    for path in paths:
+        try:
+            stat = path.stat()
+            signature.append((stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            signature.append((0, 0))
+    return tuple(signature)
+
+
+def _get_snapshot():
+    signature = _data_signature()
+    with _page_cache_lock:
+        if _page_cache["signature"] == signature and _page_cache["snapshot"] is not None:
+            return _page_cache["snapshot"], signature
+
+        conn = _conn()
+        try:
+            items = db_module.get_all_jobs_with_analysis(conn)
+            applications = db_module.get_applications(conn)
+        finally:
+            conn.close()
+        current, previous, unknown, hidden = reporter._filter_items(items)
+        app_index = {
+            item["job_id"]: item
+            for item in applications
+            if item.get("job_id") is not None
+        }
+        snapshot = {
+            "items": items,
+            "current": current,
+            "previous": previous,
+            "unknown": unknown,
+            "hidden": hidden,
+            "applications": applications,
+            "app_index": app_index,
+        }
+        _page_cache.update(signature=signature, snapshot=snapshot, html=None)
+        return snapshot, signature
 
 
 def _run_git(args, timeout=120):
@@ -99,16 +146,90 @@ def _schedule_sync():
 
 @app.route("/")
 def index():
-    conn = _conn()
-    try:
+    snapshot, signature = _get_snapshot()
+    with _page_cache_lock:
+        if _page_cache["signature"] == signature and _page_cache["html"] is not None:
+            return _page_cache["html"]
         data = {
-            "items": db_module.get_all_jobs_with_analysis(conn),
-            "applications": db_module.get_applications(conn),
+            "items": snapshot["items"],
+            "applications": snapshot["applications"],
             "date": date.today().isoformat(),
         }
-    finally:
-        conn.close()
-    return reporter.render_html(date.today().isoformat(), data, editable=True)
+        page = reporter.render_html(
+            date.today().isoformat(), data, editable=True, server_pagination=True
+        )
+        _page_cache["html"] = page
+        return page
+
+
+@app.route("/api/health")
+def health():
+    return jsonify({"ok": True, "build": _BUILD_ID})
+
+
+@app.route("/api/jobs")
+def jobs_page():
+    """Serve filtered job pages without embedding the full database in HTML."""
+    snapshot, _ = _get_snapshot()
+    cohort = request.args.get("cohort", "current")
+    if cohort == "previous":
+        items = snapshot["previous"]
+    elif cohort == "unknown":
+        items = snapshot["unknown"]
+    elif cohort == "all":
+        items = snapshot["current"] + snapshot["previous"] + snapshot["unknown"]
+    else:
+        items = snapshot["current"]
+
+    rows = reporter._jobs_payload(items, snapshot["app_index"])
+    query = request.args.get("q", "").strip().lower()
+    company = request.args.get("company", "")
+    category = request.args.get("category", "")
+    platform = request.args.get("platform", "")
+    evaluation = request.args.get("evaluation", "")
+    score_filter = request.args.get("score", "")
+
+    def matches(job):
+        if company and job["c"] != company:
+            return False
+        if category and job["cat"] != category:
+            return False
+        if platform and job["p"] != platform:
+            return False
+        if evaluation == "scored" and not job["e"]:
+            return False
+        if evaluation == "uneval" and job["e"]:
+            return False
+        if score_filter:
+            if not job["e"]:
+                return False
+            score = job["s"] or 0
+            if score_filter == "70" and score < 70:
+                return False
+            if score_filter == "60" and not 60 <= score < 70:
+                return False
+            if score_filter == "0" and score >= 60:
+                return False
+        if query:
+            haystack = f'{job["c"]} {job["t"]} {job["ct"]}'.lower()
+            if query not in haystack:
+                return False
+        return True
+
+    rows = [job for job in rows if matches(job)]
+    rows.sort(key=lambda job: job["s"] if job["e"] else -1, reverse=True)
+    per_page = max(1, min(request.args.get("per_page", 50, type=int), 5000))
+    total = len(rows)
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(request.args.get("page", 1, type=int), pages))
+    start = (page - 1) * per_page
+    return jsonify({
+        "jobs": rows[start:start + per_page],
+        "page": page,
+        "pages": pages,
+        "per_page": per_page,
+        "total": total,
+    })
 
 
 @app.route("/apply", methods=["POST"])
@@ -207,13 +328,15 @@ def main():
     # 开自动重载：改任何 .py（含 reporter.py）服务自动重启，无需手动关窗重开。
     # 重载器把脚本跑两次（监视父进程 + 真正服务的子进程）；只在子进程
     # （WERKZEUG_RUN_MAIN=true，即真正绑定端口的那个）里打印+弹一次浏览器。
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    # Keep a single server process so file watching cannot reopen the browser.
+    if os.environ.get("WERKZEUG_RUN_MAIN", "true") == "true":
         print(f"投递记录管理器已启动：{url}")
         sync_state = "开" if _AUTO_SYNC else "关（WEBAPP_AUTO_SYNC=0）"
         print(f"录入/更新投递会自动推送到远端、同步到手机端，无需手动 commit。自动同步：{sync_state}")
         print("关闭此窗口即停止。")
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-    app.run(host="127.0.0.1", port=_PORT, debug=False, use_reloader=True)
+        if os.environ.get("WEBAPP_OPEN_BROWSER", "1") == "1":
+            threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    app.run(host="127.0.0.1", port=_PORT, debug=False, use_reloader=False)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ def _make_item(company, title, score=None, rec="考虑", url=None,
             "city": city,
             "jd_url": url or f"https://example.com/{company}/{title}",
             "last_seen_at": last_seen_at,
+            "cohort": 2027,
+            "cohort_status": "confirmed",
         },
         "analysis": {
             "match_score": score,
@@ -48,6 +50,7 @@ def test_payload_structure_and_new_jobs(monkeypatch):
     new_jobs = [{
         "company": "宇树", "title": "视觉算法工程师",
         "city": "杭州", "jd_url": "https://www.unitree.com/position/123",
+        "cohort": 2027, "cohort_status": "confirmed",
     }]
     all_jobs = [
         _make_item("宇树", "视觉算法工程师", score=88, rec="推荐",
@@ -116,6 +119,8 @@ def test_previous_cohort_new_jobs_are_not_sent():
         "title": "软件开发工程师",
         "city": "北京",
         "jd_url": "current-job",
+        "cohort": 2027,
+        "cohort_status": "confirmed",
     }
     all_jobs = [
         _make_item("旧届公司", old_job["title"], score=90, rec="推荐", url="old-job"),
@@ -164,7 +169,8 @@ def test_new_jobs_section_filters_irrelevant(monkeypatch):
     monkeypatch.setenv("FEISHU_WEBHOOK", "https://open.feishu.cn/dummy")
     # 5 个新增：1 个高分相关 + 1 个实习 + 1 个不推荐 + 1 个低分 + 1 个未分析
     new_jobs = [
-        {"company": "字节", "title": "视觉算法工程师", "city": "北京", "jd_url": "u1"},
+        {"company": "字节", "title": "视觉算法工程师", "city": "北京", "jd_url": "u1",
+         "cohort": 2027, "cohort_status": "confirmed"},
         {"company": "字节", "title": "推荐算法实习生", "city": "北京", "jd_url": "u2"},
         {"company": "字节", "title": "电商运营", "city": "上海", "jd_url": "u3"},
         {"company": "字节", "title": "服务器测试", "city": "深圳", "jd_url": "u4"},
@@ -286,10 +292,9 @@ def test_high_score_section_inserts_blank_lines(monkeypatch):
     assert sep_row == [{"tag": "text", "text": ""}]
 
 
-def test_report_url_uses_configured_pages_url(monkeypatch):
-    """优先使用用户配置的 Cloudflare Pages 地址。"""
+def test_report_url_uses_cloudflare_pages(monkeypatch):
+    """报告链接固定为 Cloudflare Pages（不再依赖 GITHUB_REPOSITORY）。"""
     monkeypatch.setenv("FEISHU_WEBHOOK", "https://open.feishu.cn/dummy")
-    monkeypatch.setenv("REPORT_BASE_URL", "https://example.pages.dev/")
     monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
     with patch("notifier.requests.post") as mock_post:
         mock_post.return_value.status_code = 200
@@ -301,12 +306,5 @@ def test_report_url_uses_configured_pages_url(monkeypatch):
         ensure_ascii=False,
     )
     # 固定指向 index.html（始终最新；事后录入的投递只更新 index.html）
-    assert "https://example.pages.dev/index.html" in flat
+    assert "https://career-agent-4z4.pages.dev/index.html" in flat
     assert "2026-05-15.html" not in flat
-
-
-def test_report_url_falls_back_to_github_pages(monkeypatch):
-    monkeypatch.delenv("REPORT_BASE_URL", raising=False)
-    monkeypatch.setenv("GITHUB_REPOSITORY", "someone/career-agent")
-
-    assert notifier._report_url() == "https://someone.github.io/career-agent/index.html"

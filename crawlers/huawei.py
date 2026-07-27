@@ -117,7 +117,9 @@ class HuaweiCrawler(BaseCrawler):
                         or item.get("countryName") or "").strip()
                 main = item.get("mainBusiness") or ""
                 require = item.get("jobRequire") or ""
-                jd_raw = (f"{main}\n{require}").strip()[:1500]
+                jd_raw = "\n".join(
+                    part for part in ["岗位职责", main, "任职要求", require] if part
+                )[:12000]
 
                 all_jobs.append(
                     self._make_job(

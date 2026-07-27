@@ -22,7 +22,7 @@ class BaiduCrawler(BaseCrawler):
     DETAIL = "https://talent.baidu.com/jobs/detail/"
     PAGE_SIZE = 20  # 服务端上限 20（30+ 会报 Illegal argument）
     MAX_PAGES = 30
-    JD_RAW_LIMIT = 300
+    JD_RAW_LIMIT = 12000
     RECRUIT_TYPE = "校招"  # 合法值是中文"校招"
 
     def fetch(self) -> list[dict]:
@@ -64,7 +64,14 @@ class BaiduCrawler(BaseCrawler):
                 if not title or len(title) < 2:
                     continue
                 city = (x.get("workPlace") or "").replace(",", "、")[:40]
-                jd_raw = (x.get("workContent") or x.get("serviceCondition") or "")[:self.JD_RAW_LIMIT]
+                duties = str(x.get("workContent") or "").strip()
+                requirements = str(x.get("serviceCondition") or "").strip()
+                jd_parts = []
+                if duties:
+                    jd_parts.extend(["岗位职责", duties])
+                if requirements:
+                    jd_parts.extend(["任职要求", requirements])
+                jd_raw = "\n".join(jd_parts)[:self.JD_RAW_LIMIT]
                 jobs.append(self._make_job(title=title, city=city,
                                            jd_url=f"{self.DETAIL}{pid}", jd_raw=jd_raw))
             if page >= (result.get("pages") or 0):

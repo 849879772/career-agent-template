@@ -9,7 +9,7 @@ def test_default_profile_is_valid():
     profile = load_profile(Path(__file__).parent.parent / "profile.yaml")
 
     assert profile["target_roles"]
-    assert sum(profile["scoring_weights"].values()) == 100
+    assert sum(profile["score_component_limits"].values()) == 100
 
 
 def test_rejects_invalid_weight_total(tmp_path):
@@ -21,7 +21,7 @@ job_type: 校招
 directions: [软件开发]
 skills: [C++]
 target_roles: [C++开发]
-scoring_weights: {role: 60, skill: 30}
+score_component_limits: {core_direction: 60, required_skills: 30}
 score_thresholds: {recommend: 80, consider: 60}
 """.strip(),
         encoding="utf-8",

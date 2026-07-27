@@ -18,7 +18,8 @@ hotjob 站点把社招/校招分页：
 import logging
 import re
 import time
-from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import parse_qs, quote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -29,10 +30,90 @@ from .render import render_page
 logger = logging.getLogger(__name__)
 
 
+def _clean_detail_text(value: object) -> str:
+    if not value:
+        return ""
+    soup = BeautifulSoup(str(value), "html.parser")
+    return "\n".join(
+        line.strip() for line in soup.get_text("\n").splitlines() if line.strip()
+    )
+
+
+def _fetch_hotjob_position_detail(url: str) -> tuple[str, str, str]:
+    """Return detail text, canonical URL, and active/closed/error status."""
+    parsed = urlparse(url)
+    suite_match = re.search(r"/(SU[0-9a-fA-F]+)", parsed.path)
+    post_id = parsed.fragment or parse_qs(parsed.query).get("postId", [""])[0]
+    if not suite_match or not post_id:
+        return "", "", "error"
+
+    suite_key = suite_match.group(1)
+    origin = f"{parsed.scheme or 'https'}://{parsed.netloc}"
+    list_url = f"{origin}/{suite_key}/pb/school.html"
+    detail_url = (
+        f"{origin}/{suite_key}/pb/posDetail.html?"
+        f"postId={quote(post_id)}&postType=campus"
+    )
+    api = f"{origin}/wecruit/positionInfo/listPositionDetail/{suite_key}"
+    try:
+        response = requests.post(
+            api,
+            params={
+                "iSaJAx": "isAjax",
+                "request_locale": "zh_CN",
+                "t": str(int(time.time() * 1000)),
+            },
+            data={"postId": post_id},
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": list_url,
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if str(payload.get("state")) != "200":
+            message = str(payload.get("msg") or "")
+            status = "closed" if ("关闭" in message or "下架" in message) else "error"
+            return "", detail_url, status
+        detail = payload.get("data") or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Hotjob position detail failed %s: %s", url, exc)
+        return "", detail_url, "error"
+
+    duties = _clean_detail_text(
+        detail.get("workContent")
+        or detail.get("jobDescription")
+        or detail.get("positionDescription")
+    )
+    requirements = _clean_detail_text(
+        detail.get("serviceCondition")
+        or detail.get("requirements")
+        or detail.get("qualification")
+    )
+    extra = _clean_detail_text(detail.get("applyPositionContent"))
+    parts = []
+    if duties:
+        parts.extend(["职位描述", duties])
+    if requirements:
+        parts.extend(["任职要求", requirements])
+    if extra:
+        parts.extend(["补充说明", extra])
+    return "\n".join(parts)[:12000], detail_url, "active"
+
+
+def fetch_hotjob_position_detail(url: str) -> tuple[str, str]:
+    """Fetch one public Hotjob position detail and its canonical browser URL."""
+    detail, detail_url, _status = _fetch_hotjob_position_detail(url)
+    return detail, detail_url
+
+
 class HotjobRecruitCrawler(BaseCrawler):
     EXTRA_WAIT_MS = 6000
     SCROLL_TIMES = 6
-    JD_RAW_LIMIT = 300
+    DETAIL_WORKERS = 8
+    JD_RAW_LIMIT = 12000
     _SKIP_TITLES = {"职位名称", "岗位名称"}  # 表头行
 
     def _base(self) -> str:
@@ -177,6 +258,20 @@ class HotjobRecruitCrawler(BaseCrawler):
             if not page_form.get("pageData"):
                 break
             page += 1
+
+        def hydrate(job: dict) -> dict | None:
+            detail, detail_url, status = _fetch_hotjob_position_detail(job["jd_url"])
+            if status == "closed":
+                return None
+            if detail:
+                job["jd_raw"] = detail
+            if detail_url:
+                job["jd_url"] = detail_url
+                job["link_kind"] = "detail"
+            return job
+
+        with ThreadPoolExecutor(max_workers=self.DETAIL_WORKERS) as executor:
+            jobs = [job for job in executor.map(hydrate, jobs) if job is not None]
         return jobs
 
     def _parse_mc(self, html: str, list_url: str) -> list[dict]:

@@ -14,7 +14,7 @@ class SFCrawler(BaseCrawler):
     API = "https://campus.sf-express.com/api/web/position/query"
     PAGE_SIZE = 50
     MAX_PAGES = 10
-    JD_RAW_LIMIT = 1000
+    JD_RAW_LIMIT = 12000
 
     def fetch(self) -> list[dict]:
         headers = {
@@ -42,15 +42,15 @@ class SFCrawler(BaseCrawler):
                 if not title or job_id in seen:
                     continue
                 seen.add(job_id)
-                jd_raw = "\n".join(
-                    x for x in [
-                        item.get("orgSourceName") or "",
-                        item.get("positionTypeName") or "",
-                        item.get("internTypeName") or "",
-                        item.get("postDuty") or "",
-                        item.get("jobRequirement") or "",
-                    ] if x
-                )
+                duties = str(item.get("postDuty") or "").strip()
+                requirements = str(item.get("jobRequirement") or "").strip()
+                jd_raw = "\n".join(x for x in [
+                    item.get("orgSourceName") or "",
+                    item.get("positionTypeName") or "",
+                    item.get("internTypeName") or "",
+                    "岗位职责", duties,
+                    "任职要求", requirements,
+                ] if x)
                 jobs.append(self._make_job(
                     title=title,
                     city=(item.get("demandCity") or "")[:80],

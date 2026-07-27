@@ -1,4 +1,6 @@
 import concurrent.futures
+from datetime import datetime, timedelta
+import hashlib
 import json
 import logging
 import os
@@ -6,8 +8,12 @@ from pathlib import Path
 import re
 import requests
 import time
+import unicodedata
 
 import db as db_module
+import job_cohorts
+import job_details
+import job_filters
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +21,24 @@ logger = logging.getLogger(__name__)
 # 串行时分析吞吐 ~几百/次，远跟不上爬取量（~2000/天）；并发后吞吐翻数倍。
 # call_deepseek_api 已对 429/5xx 指数退避重试，并发触发限流时自动退避。
 _ANALYZE_WORKERS = max(1, int(os.environ.get("ANALYZE_WORKERS", "4")))
+_JD_HYDRATE_WORKERS = max(1, int(os.environ.get("JD_HYDRATE_WORKERS", "2")))
+
+ANALYSIS_VERSION = "match-v2.0"
+SCREENING_VERSION = "target-tier-v2.0"
+
+_SCORE_COMPONENT_LIMITS = {
+    "core_direction": 25,
+    "required_skills": 25,
+    "project_evidence": 25,
+    "engineering_stack": 15,
+    "basic_criteria": 10,
+}
+_EVIDENCE_CAPS = {
+    "direct": 100,
+    "partial": 79,
+    "adjacent": 64,
+    "insufficient": 49,
+}
 
 _DEFAULT_ANALYSIS = {
     "match_score": 0,
@@ -24,7 +48,34 @@ _DEFAULT_ANALYSIS = {
     "recommendation": "考虑",
 }
 
+_INCOMPLETE_JD_ANALYSIS = {
+    "match_score": 0,
+    "score_breakdown": {},
+    "evidence": [],
+    "evidence_level": "insufficient",
+    "advantages": [],
+    "gaps": ["JD 不完整，无法核对岗位核心要求"],
+    "summary": "JD不完整，待补全后评分",
+    "recommendation": "考虑",
+    "analysis_status": "jd_incomplete",
+}
+
+_UNCONFIRMED_COHORT_ANALYSIS = {
+    "match_score": 0,
+    "score_breakdown": {},
+    "evidence": [],
+    "evidence_level": "insufficient",
+    "advantages": [],
+    "gaps": ["届别尚未由官方信息确认为 2027 届"],
+    "summary": "届别待确认，不进行匹配评分",
+    "recommendation": "未评估",
+    "analysis_status": "cohort_unconfirmed",
+}
+
+_VALID_RECOMMENDATIONS = {"推荐", "考虑", "不推荐"}
+
 _DEFAULT_MODEL = "deepseek-v4-flash"
+_DEFAULT_ANALYSIS_MODEL = "deepseek-v4-pro"
 _DEFAULT_MAX_TOKENS = 1000
 _ANTHROPIC_VERSION = "2023-06-01"
 _DEEPSEEK_TOKEN_KEY = "DEEPSEEK_API_KEY"
@@ -186,7 +237,7 @@ def call_claude_api(*args, **kwargs) -> str:
 
 # 单次粗筛的标题条数上限：DeepSeek 的 reasoning token 会挤占输出空间，
 # 小批量能显著降低 JSON 截断和长度不匹配概率。
-_CLASSIFY_BATCH = 40
+_CLASSIFY_BATCH = 20
 
 _RELEVANT_TITLE_PATTERNS = (
     "机器人", "视觉", "机器视觉", "感知", "slam", "点云", "图像", "算法", "cv", "计算机视觉",
@@ -209,88 +260,174 @@ _IRRELEVANT_TITLE_PATTERNS = (
     "主播", "编辑", "文案", "管培", "证券", "投资", "审计",
 )
 
+_SCREENING_TIERS = {"A", "B", "C"}
+_DIRECT_CPP_TITLE_RE = re.compile(
+    r"C\s*/\s*C\+\+|C\+\+|C语言|(?<![A-Za-z])C开发|"
+    r"上位机|桌面端|PC客户端|客户端开发|"
+    r"Windows(?:终端|系统).{0,8}(?:开发|软件)",
+    re.I,
+)
+_ROBOT_VISION_TITLE_RE = re.compile(
+    r"机器人视觉|机器视觉|视觉算法|点云|手眼标定|目标检测|"
+    r"机械臂|机器人(?:软件|系统|算法)|SLAM|导航算法|运控|运动控制",
+    re.I,
+)
+_TEST_TITLE_RE = re.compile(
+    r"测试开发|测开|SDET|软件测试|自动化测试|算法测试|机器人测试|"
+    r"智能测试|系统测试|研发测试|实验室测试|测试助理|测试\s*Infra|测试工程师",
+    re.I,
+)
+_SOFTWARE_TITLE_RE = re.compile(
+    r"软件(?:开发|研发|工程师|架构)|系统软件|平台软件|应用软件|"
+    r"嵌入式(?:软件|开发|工程师)|客户端|服务端|后端|研发方向|计算机软件类",
+    re.I,
+)
+_ASPIRATIONAL_TITLE_RE = re.compile(
+    r"大模型|LLM|AIGC|智能体|Agent|RAG|具身|VLA|VLM|强化学习|"
+    r"模仿学习|世界模型|多模态|AI(?:应用|算法|工程)|人工智能|"
+    r"视觉|感知|机器人|机械臂|SLAM|控制|运动规划|仿真|"
+    r"智能算法|图像算法|软件算法|AI\s*Infra",
+    re.I,
+)
+_BROAD_TECHNICAL_TITLE_RE = re.compile(
+    r"算法|软件|开发|研发|测试|嵌入式|系统|模型|AI|Python|Java|"
+    r"前端|全栈|数据库|内核|编译|中间件|Infra|Linux|工程师|研究",
+    re.I,
+)
+_OFF_TARGET_TECH_TITLE_RE = re.compile(
+    r"Java|前端|Web|Android|iOS|Golang|Go语言|PHP|数据库|大数据|"
+    r"数据分析|网络安全|信息安全|芯片|IC设计|FPGA|硬件|结构|电气|射频|天线",
+    re.I,
+)
+_CPP_STACK_RE = re.compile(
+    r"C\s*/\s*C\+\+|C\+\+|C语言|Qt|Linux|Ubuntu|Windows|多线程|"
+    r"操作系统|客户端|桌面端",
+    re.I,
+)
+_TEST_STACK_RE = re.compile(
+    r"自动化|测试平台|测试框架|接口测试|性能测试|单元测试|集成测试|"
+    r"测试工具|测试脚本|Python|C\+\+|代码|编程",
+    re.I,
+)
+_ROBOT_VISION_EVIDENCE_RE = re.compile(
+    r"ROS|SCARA|RealSense|深度相机|点云|手眼标定|YOLO|目标检测|"
+    r"机械臂|机器人视觉|机器视觉|机器人|Gazebo|Isaac|运动规划|轨迹|抓取",
+    re.I,
+)
 
-def _profile_directions(profile: dict) -> list[str]:
-    directions = profile.get("directions") or []
-    if not directions and profile.get("direction"):
-        directions = [profile["direction"]]
-    return [str(item).strip() for item in directions if str(item).strip()]
 
-
-def _profile_target_roles(profile: dict) -> list[dict]:
-    roles = profile.get("target_roles") or []
-    normalized = []
-    for role in roles:
+def _configured_title_keywords(profile: dict | None) -> tuple[str, ...]:
+    if not profile:
+        return ()
+    words = []
+    for role in profile.get("target_roles") or []:
         if isinstance(role, str):
-            normalized.append({"name": role, "keywords": [role]})
-            continue
-        if isinstance(role, dict) and role.get("name"):
-            normalized.append({
-                "name": str(role["name"]),
-                "keywords": [str(word) for word in role.get("keywords", []) if str(word).strip()],
-            })
-    return normalized
-
-
-def _profile_relevant_keywords(profile: dict | None) -> tuple[str, ...]:
-    if not profile:
-        return ()
-    words = list(profile.get("skills") or [])
-    for role in _profile_target_roles(profile):
-        words.extend(role["keywords"])
-    return tuple(str(word).lower().strip() for word in words if str(word).strip())
-
-
-def _profile_excluded_keywords(profile: dict | None) -> tuple[str, ...]:
-    if not profile:
-        return ()
+            words.append(role)
+        elif isinstance(role, dict):
+            words.append(role.get("name", ""))
+            words.extend(role.get("keywords") or [])
     return tuple(
-        str(word).lower().strip()
-        for word in profile.get("excluded_title_keywords", [])
+        unicodedata.normalize("NFKC", str(word)).strip().casefold()
+        for word in words
         if str(word).strip()
     )
 
 
-def _target_roles_prompt(profile: dict) -> str:
-    roles = _profile_target_roles(profile)
-    if not roles:
-        return "\n".join(f"  - {direction}" for direction in _profile_directions(profile))
-    return "\n".join(
-        f"  - {role['name']}：{', '.join(role['keywords'])}"
-        for role in roles
+def local_screening_tier(job: dict, profile: dict | None = None) -> str:
+    """Return a conservative local A/B/C tier without calling an LLM.
+
+    A means the title and available JD contain concrete evidence for this
+    profile. B is a target or technical role that still needs a cheap review.
+    C is a high-confidence non-target role.
+    """
+    title = unicodedata.normalize("NFKC", str(job.get("title") or "")).strip()
+    body = unicodedata.normalize("NFKC", str(job.get("jd_raw") or "")).strip()
+    if job_filters.is_job_record_noise({**job, "title": title}):
+        return "C"
+    normalized = title.casefold()
+    excluded = tuple(
+        unicodedata.normalize("NFKC", str(word)).strip().casefold()
+        for word in (profile or {}).get("excluded_title_keywords", [])
+        if str(word).strip()
     )
+    if any(word in normalized for word in excluded):
+        return "C"
+    if any(word in normalized for word in _IRRELEVANT_TITLE_PATTERNS):
+        return "C"
 
-
-def _scoring_prompt(profile: dict) -> str:
-    weights = profile.get("scoring_weights") or {
-        "role_relevance": 35,
-        "skill_match": 30,
-        "responsibility_match": 20,
-        "education_fit": 10,
-        "location_preference": 5,
-    }
-    labels = {
-        "role_relevance": "目标岗位相关度",
-        "skill_match": "技术栈匹配度",
-        "responsibility_match": "岗位职责匹配度",
-        "education_fit": "学历与经验要求匹配度",
-        "location_preference": "工作地点偏好",
-    }
-    return "\n".join(
-        f"  - {labels.get(key, key)}：{value} 分"
-        for key, value in weights.items()
+    combined = f"{title}\n{body[:6000]}"
+    configured_match = any(
+        word in normalized for word in _configured_title_keywords(profile)
     )
+    if _DIRECT_CPP_TITLE_RE.search(title):
+        return "A"
+    if _ROBOT_VISION_TITLE_RE.search(title):
+        return "A" if _ROBOT_VISION_EVIDENCE_RE.search(combined) else "B"
+    if _TEST_TITLE_RE.search(title):
+        return (
+            "A"
+            if _TEST_STACK_RE.search(combined)
+            or (
+                re.search(r"机器人|机械臂", title)
+                and _ROBOT_VISION_EVIDENCE_RE.search(combined)
+            )
+            else "B"
+        )
+    if _OFF_TARGET_TECH_TITLE_RE.search(title):
+        return "C"
+    if (
+        _ASPIRATIONAL_TITLE_RE.search(title)
+        and _ROBOT_VISION_EVIDENCE_RE.search(combined)
+    ):
+        return "A"
+    if _SOFTWARE_TITLE_RE.search(title):
+        return "A" if _CPP_STACK_RE.search(combined) else "B"
+    if _ASPIRATIONAL_TITLE_RE.search(title):
+        if re.search(r"AI\s*Infra|AI应用|大模型应用|仿真平台|智能算法", title, re.I):
+            if _CPP_STACK_RE.search(combined) or _TEST_STACK_RE.search(combined):
+                return "A"
+        return "B"
+    if _BROAD_TECHNICAL_TITLE_RE.search(title):
+        return "B"
+    if configured_match:
+        return "B"
+    return "C"
 
 
-def _recommendation_for_score(score: int, profile: dict) -> str:
-    thresholds = profile.get("score_thresholds") or {}
-    recommend = int(thresholds.get("recommend", 80))
-    consider = int(thresholds.get("consider", 60))
-    if score >= recommend:
-        return "推荐"
-    if score >= consider:
-        return "考虑"
-    return "不推荐"
+def classify_job_tiers(
+    jobs: list[dict],
+    profile: dict,
+    model: str = _DEFAULT_MODEL,
+    max_tokens: int = _DEFAULT_MAX_TOKENS,
+) -> list[str]:
+    """Classify jobs as A (Pro), B (display only), or C (reject).
+
+    Only ambiguous local-B jobs use Flash. Strong local matches and hard
+    rejections avoid model cost entirely.
+    """
+    if not jobs:
+        return []
+
+    tiers = [local_screening_tier(job, profile) for job in jobs]
+    ambiguous = [(index, jobs[index]) for index, tier in enumerate(tiers) if tier == "B"]
+    if not ambiguous:
+        return tiers
+
+    chunks = [
+        ambiguous[i:i + _CLASSIFY_BATCH]
+        for i in range(0, len(ambiguous), _CLASSIFY_BATCH)
+    ]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_ANALYZE_WORKERS) as ex:
+        batch_results = ex.map(
+            lambda chunk: _classify_tier_batch(
+                [job for _, job in chunk], profile, model, max_tokens
+            ),
+            chunks,
+        )
+        for chunk, result in zip(chunks, batch_results):
+            for (index, _), tier in zip(chunk, result):
+                tiers[index] = tier
+    return tiers
 
 
 def classify_relevant_titles(
@@ -299,134 +436,353 @@ def classify_relevant_titles(
     model: str = _DEFAULT_MODEL,
     max_tokens: int = _DEFAULT_MAX_TOKENS,
 ) -> list[bool]:
-    """批量送岗位标题让 DeepSeek 粗筛是否值得详细分析。
-
-    按 _CLASSIFY_BATCH 条/批分块多次调用（接入全部公司后标题可达数千，
-    单次调用会撑爆请求体/响应 token），拼接各批 flags。每批失败时使用本地关键词兜底。
-
-    Returns: 与 titles 等长的 bool 列表
-    """
-    if not titles:
-        return []
-    chunks = [titles[i:i + _CLASSIFY_BATCH] for i in range(0, len(titles), _CLASSIFY_BATCH)]
-    if len(chunks) == 1:
-        return _classify_batch(chunks[0], profile, model, max_tokens)
-    # 多批并发（粗筛纯 API、不碰 DB）；executor.map 保持顺序拼接，flags 仍与 titles 对齐
-    flags: list[bool] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_ANALYZE_WORKERS) as ex:
-        for batch_flags in ex.map(lambda ch: _classify_batch(ch, profile, model, max_tokens), chunks):
-            flags.extend(batch_flags)
-    return flags
+    """Backward-compatible boolean wrapper around tiered screening."""
+    jobs = [{"title": title, "jd_raw": ""} for title in titles]
+    return [
+        tier != "C"
+        for tier in classify_job_tiers(jobs, profile, model, max_tokens)
+    ]
 
 
-def _classify_batch(
-    titles: list[str],
+def _classify_tier_batch(
+    jobs: list[dict],
     profile: dict,
     model: str = _DEFAULT_MODEL,
     max_tokens: int = _DEFAULT_MAX_TOKENS,
-) -> list[bool]:
-    """粗筛单批标题（≤ _CLASSIFY_BATCH 条）。出错时用本地关键词兜底，避免全量放行。"""
-    if not titles:
+) -> list[str]:
+    """Use Flash only for one batch of ambiguous local-B jobs."""
+    if not jobs:
         return []
 
-    directions = " / ".join(_profile_directions(profile))
-    roles_prompt = _target_roles_prompt(profile)
-    excluded = ", ".join(profile.get("excluded_title_keywords", []))
     system_prompt = (
-        "你是一个职业方向粗筛助手。候选人背景：\n"
-        f"方向：{directions}\n"
-        f"技能：{', '.join(profile.get('skills', [])[:20])}\n"
-        f"求职类型：{profile.get('job_type', '校招')}\n\n"
-        "候选人目标岗位（任一类相关即视为 true）：\n"
-        f"{roles_prompt}\n\n"
-        "下面是一批岗位标题。对每条判断：是否值得详细分析？\n"
-        "判断标准：\n"
-        "  - 与候选人上面任一目标类别有合理交集 → true\n"
-        f"  - 命中排除关键词（{excluded}）或明显不相关 → false\n\n"
-        f"输出严格的 JSON 数组，长度必须等于 {len(titles)}，每项为 true 或 false。\n"
-        '例如：[true, false, true, false]\n'
-        "不要输出任何其他文字、解释或 markdown 包裹。"
+        "你是校招岗位的低成本分流器，不负责详细评分。候选人证据如下：\n"
+        f"{_profile_context(profile)}\n\n"
+        "将每个岗位分为一档：\n"
+        "A：根据标题和JD摘要，核心要求已有直接项目证据，预计严格匹配分可达到60分，值得调用Pro。\n"
+        "B：属于候选人目标或学习方向，但直接项目证据不足、JD信息不足或只能迁移，保留展示但不调用Pro。\n"
+        "C：方向明显不符，包括纯Java/前端/硬件/结构/电气/产品/运营等非目标岗位。\n"
+        "learning_targets和unverified_skills不能作为已掌握能力；仅有Python、Linux等通用词不能判A。\n"
+        f"输出严格JSON数组，包含ID 1到{len(jobs)}，格式为"
+        '{"id":1,"tier":"A"}。只输出JSON，不要解释。'
     )
-    user_message = "\n".join(f"{i}. {t}" for i, t in enumerate(titles))
+    user_message = "\n".join(
+        f"{index}. 标题：{job.get('title', '')}\n"
+        f"JD摘要：{' '.join(str(job.get('jd_raw') or '').split())[:900]}"
+        for index, job in enumerate(jobs, start=1)
+    )
+    fallback = [local_screening_tier(job, profile) for job in jobs]
 
     try:
         content = call_deepseek_api(system_prompt, user_message, model, max_tokens).strip()
-        flags = json.loads(_extract_json_array_text(content))
-        if not isinstance(flags, list) or len(flags) != len(titles):
-            raise ValueError(f"预筛响应长度 {len(flags) if isinstance(flags, list) else '非数组'} ≠ {len(titles)}")
-        return [_merge_model_and_keyword_relevance(title, bool(flag), profile) for title, flag in zip(titles, flags)]
+        response_items = _parse_json_array(content)
+        if not isinstance(response_items, list):
+            raise ValueError("预筛响应不是数组")
+        if response_items and all(isinstance(item, bool) for item in response_items):
+            if len(response_items) != len(jobs):
+                raise ValueError(f"旧式预筛响应长度 {len(response_items)} ≠ {len(jobs)}")
+            return [
+                _merge_screening_tier(job, "A" if flag else "C", profile)
+                for job, flag in zip(jobs, response_items)
+            ]
+
+        tiers = list(fallback)
+        seen_ids = set()
+        for item in response_items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                item_id = int(item.get("id"))
+            except (TypeError, ValueError):
+                continue
+            if 1 <= item_id <= len(jobs):
+                index = item_id - 1
+                raw_tier = str(item.get("tier") or "").strip().upper()
+                if raw_tier not in _SCREENING_TIERS and "relevant" in item:
+                    raw_tier = "A" if bool(item.get("relevant")) else "C"
+                if raw_tier in _SCREENING_TIERS:
+                    tiers[index] = _merge_screening_tier(
+                        jobs[index], raw_tier, profile
+                    )
+                seen_ids.add(item_id)
+        if not seen_ids:
+            raise ValueError("预筛响应没有有效岗位 ID")
+        missing = len(jobs) - len(seen_ids)
+        if missing:
+            logger.warning("预筛响应遗漏 %d/%d 条，仅遗漏项使用本地B档兜底", missing, len(jobs))
+        return tiers
     except Exception as e:
-        logger.error("DeepSeek 相关性预筛失败（使用本地关键词兜底）: %s", e)
-        return [_keyword_relevance_fallback(title, profile) for title in titles]
+        logger.error("DeepSeek 分级预筛失败（保守保留为本地档位）: %s", e)
+        return fallback
 
 
-def _extract_json_array_text(content: str) -> str:
+def _parse_json_array(content: str) -> list:
     content = re.sub(r"^```(?:json)?\s*", "", content.strip())
     content = re.sub(r"\s*```$", "", content).strip()
     start = content.find("[")
-    end = content.rfind("]")
-    if start != -1 and end != -1 and end > start:
-        return content[start:end + 1]
-    return content
+    if start == -1:
+        raise ValueError("预筛响应中没有 JSON 数组")
+    value, _ = json.JSONDecoder().raw_decode(content[start:])
+    if not isinstance(value, list):
+        raise ValueError("预筛响应不是数组")
+    return value
 
 
-def _keyword_relevance_fallback(title: str, profile: dict | None = None) -> bool:
-    normalized = (title or "").lower()
-    excluded = _IRRELEVANT_TITLE_PATTERNS + _profile_excluded_keywords(profile)
-    if any(word in normalized for word in excluded):
-        return False
-    relevant = _RELEVANT_TITLE_PATTERNS + _profile_relevant_keywords(profile)
-    return any(word in normalized for word in relevant)
+def _keyword_relevance_fallback(title: str) -> bool:
+    return local_screening_tier({"title": title, "jd_raw": ""}) != "C"
 
 
-def _merge_model_and_keyword_relevance(
-    title: str,
-    model_flag: bool,
-    profile: dict | None = None,
-) -> bool:
-    normalized = (title or "").lower()
-    excluded = _IRRELEVANT_TITLE_PATTERNS + _profile_excluded_keywords(profile)
-    if any(word in normalized for word in excluded):
-        return False
-    relevant = _RELEVANT_TITLE_PATTERNS + _profile_relevant_keywords(profile)
-    return model_flag or any(word in normalized for word in relevant)
+def _merge_model_and_keyword_relevance(title: str, model_flag: bool) -> bool:
+    tier = _merge_screening_tier(
+        {"title": title, "jd_raw": ""},
+        "A" if model_flag else "C",
+    )
+    return tier != "C"
+
+
+def _merge_screening_tier(
+    job: dict, model_tier: str, profile: dict | None = None
+) -> str:
+    """Keep hard negatives and direct local evidence deterministic."""
+    local_tier = local_screening_tier(job, profile)
+    if local_tier == "C":
+        return "C"
+    if local_tier == "A":
+        return "A"
+    title = str(job.get("title") or "")
+    if model_tier == "C" and (
+        _SOFTWARE_TITLE_RE.search(title)
+        or _TEST_TITLE_RE.search(title)
+        or _ASPIRATIONAL_TITLE_RE.search(title)
+    ):
+        return "B"
+    return model_tier if model_tier in _SCREENING_TIERS else "B"
+
+
+def _stable_hash(value) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def jd_fingerprint(job: dict) -> str:
+    return _stable_hash({
+        "company": " ".join(str(job.get("company") or "").split()),
+        "title": " ".join(str(job.get("title") or "").split()),
+        "city": " ".join(str(job.get("city") or "").split()),
+        "jd_raw": " ".join(str(job.get("jd_raw") or "").split()),
+    })
+
+
+def profile_fingerprint(profile: dict) -> str:
+    return _stable_hash(profile)
+
+
+def analysis_metadata(job: dict, profile: dict, model: str) -> dict:
+    return {
+        "analysis_version": ANALYSIS_VERSION,
+        "jd_fingerprint": jd_fingerprint(job),
+        "profile_fingerprint": profile_fingerprint(profile),
+        "model": model,
+    }
+
+
+def needs_analysis(conn, job: dict, profile: dict, model: str) -> bool:
+    metadata = analysis_metadata(job, profile, model)
+    return not db_module.analysis_is_current(conn, job["id"], **metadata)
+
+
+def _profile_context(profile: dict) -> str:
+    matching = profile.get("matching") or {}
+    if not matching:
+        return (
+            f"目标方向：{profile.get('direction', '')}\n"
+            f"候选人自述技能：{', '.join(profile.get('skills', []))}\n"
+            "注意：未给出项目证据或熟练度的技能只能视为部分证据。"
+        )
+    return json.dumps(
+        {
+            "primary_directions": matching.get("primary_directions", []),
+            "secondary_directions": matching.get("secondary_directions", []),
+            "project_evidence": matching.get("project_evidence", []),
+            "supporting_skills": matching.get("supporting_skills", []),
+            "learning_targets": matching.get("learning_targets", []),
+            "unverified_skills": matching.get("unverified_skills", []),
+            "degree": profile.get("degree", ""),
+            "job_type": profile.get("job_type", ""),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def _score_component_limits(profile: dict) -> dict[str, int]:
+    configured = profile.get("score_component_limits") or {}
+    if set(configured) != set(_SCORE_COMPONENT_LIMITS):
+        return dict(_SCORE_COMPONENT_LIMITS)
+    try:
+        limits = {name: int(configured[name]) for name in _SCORE_COMPONENT_LIMITS}
+    except (TypeError, ValueError):
+        return dict(_SCORE_COMPONENT_LIMITS)
+    if any(value < 0 for value in limits.values()) or sum(limits.values()) != 100:
+        return dict(_SCORE_COMPONENT_LIMITS)
+    return limits
+
+
+def _as_string_list(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _normalize_evidence(value) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    normalized = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        relation = str(item.get("relation") or "").strip().lower()
+        requirement_type = str(item.get("requirement_type") or "").strip().lower()
+        if relation not in {"direct", "adjacent", "missing"}:
+            relation = "missing"
+        if requirement_type not in {"core", "supporting", "basic"}:
+            requirement_type = "supporting"
+        normalized.append({
+            "jd_requirement": str(item.get("jd_requirement") or "").strip(),
+            "profile_evidence": str(item.get("profile_evidence") or "").strip(),
+            "relation": relation,
+            "requirement_type": requirement_type,
+        })
+    return normalized
+
+
+def _parse_analysis_json(content: str) -> dict:
+    try:
+        result = json.loads(content)
+    except json.JSONDecodeError:
+        # Some Anthropic-compatible responses contain a literal newline or tab
+        # inside a JSON string. Python's non-strict mode safely accepts those
+        # control characters while still rejecting broken structure.
+        result = json.loads(content, strict=False)
+    if not isinstance(result, dict):
+        raise ValueError("细分析响应不是 JSON 对象")
+    return result
+
+
+def _finalize_analysis(raw: dict, job: dict, profile: dict, model: str) -> dict:
+    raw_breakdown = raw.get("score_breakdown")
+    if not isinstance(raw_breakdown, dict):
+        raise ValueError("细分析响应缺少 score_breakdown")
+
+    limits = _score_component_limits(profile)
+    breakdown = {}
+    for name, maximum in limits.items():
+        try:
+            value = int(round(float(raw_breakdown.get(name, 0))))
+        except (TypeError, ValueError):
+            value = 0
+        breakdown[name] = max(0, min(maximum, value))
+
+    evidence_level = str(raw.get("evidence_level") or "insufficient").strip().lower()
+    if evidence_level not in _EVIDENCE_CAPS:
+        evidence_level = "insufficient"
+    evidence = _normalize_evidence(raw.get("evidence"))
+    missing_core = _as_string_list(raw.get("missing_core_requirements"))
+
+    score = min(100, sum(breakdown.values()), _EVIDENCE_CAPS[evidence_level])
+    direct_core_count = sum(
+        item["relation"] == "direct" and item["requirement_type"] == "core"
+        for item in evidence
+    )
+    if direct_core_count == 0:
+        score = min(score, 64)
+    if len(missing_core) == 1:
+        score = min(score, 74)
+    elif len(missing_core) >= 2:
+        score = min(score, 64)
+    if score >= 90 and direct_core_count < 2:
+        score = 89
+
+    advantages = _as_string_list(raw.get("advantages"))
+    gaps = _as_string_list(raw.get("gaps"))
+    for gap in missing_core:
+        if gap not in gaps:
+            gaps.append(gap)
+
+    thresholds = profile.get("score_thresholds") or {}
+    recommend_threshold = int(thresholds.get("recommend", 80))
+    consider_threshold = int(thresholds.get("consider", 60))
+    if score >= recommend_threshold:
+        recommendation = "推荐"
+    elif score >= consider_threshold:
+        recommendation = "考虑"
+    else:
+        recommendation = "不推荐"
+
+    return {
+        "match_score": score,
+        "score_breakdown": breakdown,
+        "evidence": evidence,
+        "evidence_level": evidence_level,
+        "advantages": advantages,
+        "gaps": gaps,
+        "summary": str(raw.get("summary") or "").strip(),
+        "recommendation": recommendation,
+        "analysis_status": "complete",
+        **analysis_metadata(job, profile, model),
+    }
 
 
 def analyze_job(
     job: dict,
     profile: dict,
-    model: str = _DEFAULT_MODEL,
+    model: str = _DEFAULT_ANALYSIS_MODEL,
     max_tokens: int = _DEFAULT_MAX_TOKENS,
 ) -> dict:
-    directions = " / ".join(_profile_directions(profile))
-    roles_prompt = _target_roles_prompt(profile)
-    scoring_prompt = _scoring_prompt(profile)
-    cities = ", ".join(profile.get("preferred_cities", [])) or "不限"
-    thresholds = profile.get("score_thresholds") or {"recommend": 80, "consider": 60}
+    if not job_cohorts.is_confirmed_current(job):
+        return {
+            **_UNCONFIRMED_COHORT_ANALYSIS,
+            **analysis_metadata(job, profile, model),
+        }
+    if job_details.is_jd_incomplete(job):
+        return {**_INCOMPLETE_JD_ANALYSIS, **analysis_metadata(job, profile, model)}
+
+    limits = _score_component_limits(profile)
     system_prompt = (
-        "你是一个职业顾问。以下是候选人背景：\n"
-        f"技能：{', '.join(profile.get('skills', []))}\n"
-        f"方向：{directions}\n"
-        f"学历：{profile.get('degree', '')}\n"
-        f"求职类型：{profile.get('job_type', '校招')}\n"
-        f"意向城市：{cities}\n\n"
-        "候选人可投目标岗位（任一类匹配即可，不必全部对上）：\n"
-        f"{roles_prompt}\n\n"
-        "match_score 必须严格按以下权重逐项评分并求和（满分 100）：\n"
-        f"{scoring_prompt}\n"
-        f"推荐阈值：score >= {thresholds.get('recommend', 80)} 为推荐，"
-        f"score >= {thresholds.get('consider', 60)} 为考虑，否则不推荐。\n"
-        "请分析以下岗位与候选人的匹配度，仅输出JSON，不输出任何其他内容。\n"
-        'JSON格式：{"match_score": 85, "advantages": ["优势1"], '
-        '"gaps": ["缺失技能"], "summary": "一句话摘要", "recommendation": "推荐"}\n'
-        "recommendation 只能是：推荐、考虑、不推荐 三选一。"
+        "你是严格的校招岗位匹配审计员。不得根据公司业务、岗位名称或常识替候选人虚构经验。\n"
+        "只有候选人配置中 project_evidence 的内容可作为直接项目证据；supporting_skills "
+        "只能作为工程栈证据；learning_targets 和 unverified_skills 均不能作为已掌握能力。\n\n"
+        f"候选人结构化配置：\n{_profile_context(profile)}\n\n"
+        "请逐条对照 JD，按以下上限给出整数子分：\n"
+        f"- core_direction 0-{limits['core_direction']}：岗位核心职责与主/次方向的一致性。\n"
+        f"- required_skills 0-{limits['required_skills']}：JD 必备技能中有直接证据的覆盖度。\n"
+        f"- project_evidence 0-{limits['project_evidence']}：真实项目证据的数量、深度和相似程度。\n"
+        f"- engineering_stack 0-{limits['engineering_stack']}：语言、框架、工具和工程环境。\n"
+        f"- basic_criteria 0-{limits['basic_criteria']}：学历、届别等基础条件；地点不计入技能分。\n\n"
+        "证据规则：\n"
+        "1. relation 只能为 direct、adjacent、missing；requirement_type 只能为 core、supporting、basic。\n"
+        "2. C++、Python、Qt、Linux 等通用工具重叠不能代替算法、业务或项目经验。\n"
+        "3. 仅有工具重叠或邻接经验时 evidence_level 必须为 adjacent，不能写 direct。\n"
+        "4. 缺少三维重建、跟踪、CAM、计算几何、强化学习等 JD 核心能力时必须列入 missing_core_requirements。\n"
+        "5. 不得使用“精通”“完全匹配”等超出候选人配置证据的表述。\n"
+        "6. evidence_level：direct=核心要求大多有直接项目证据；partial=有部分直接证据；"
+        "adjacent=主要依赖可迁移经验；insufficient=证据不足。\n\n"
+        "输出必须精炼：evidence 最多6条，advantages 最多4条，gaps 最多4条；"
+        "每个数组元素不超过50个汉字，summary 不超过80个汉字。\n"
+        "仅输出 JSON，不输出 markdown。不要输出总分和推荐结论，它们由程序计算。"
+        "所有字符串必须位于同一行，字符串内部的双引号必须转义，字段之间必须保留逗号。\n"
+        'JSON格式：{"score_breakdown":{"core_direction":0,"required_skills":0,'
+        '"project_evidence":0,"engineering_stack":0,"basic_criteria":0},'
+        '"evidence_level":"partial","evidence":[{"jd_requirement":"核心要求",'
+        '"profile_evidence":"候选人证据或未提供","relation":"direct",'
+        '"requirement_type":"core"}],"missing_core_requirements":["缺失的核心要求"],'
+        '"advantages":["有证据的优势"],"gaps":["其他差距"],"summary":"一句话审慎结论"}'
     )
 
     user_message = (
         f"公司：{job['company']}\n"
         f"岗位：{job['title']}\n"
         f"城市：{job.get('city', '')}\n"
-        f"岗位描述：{job.get('jd_raw', '')[:2000]}"
+        f"岗位描述：{job.get('jd_raw', '')[:6000]}"
     )
 
     try:
@@ -438,45 +794,237 @@ def analyze_job(
         content = content.strip()
 
         try:
-            result = json.loads(content)
-        except json.JSONDecodeError as e:
+            result = _parse_analysis_json(content)
+        except (json.JSONDecodeError, ValueError) as e:
             logger.warning(
                 "JSON解析失败 [%s %s]: %s | 原始内容: %.200s",
                 job["company"], job["title"], e, content,
             )
             return dict(_DEFAULT_ANALYSIS)
 
-        result.setdefault("match_score", 0)
-        result["match_score"] = max(0, min(100, int(result["match_score"])))
-        result.setdefault("advantages", [])
-        result.setdefault("gaps", [])
-        result.setdefault("summary", "")
-        result["recommendation"] = _recommendation_for_score(result["match_score"], profile)
-
-        return result
+        try:
+            return _finalize_analysis(result, job, profile, model)
+        except (TypeError, ValueError) as e:
+            logger.warning("评分响应校验失败 [%s %s]: %s", job["company"], job["title"], e)
+            return dict(_DEFAULT_ANALYSIS)
 
     except Exception as e:
         logger.error("DeepSeek API 分析失败 [%s %s]: %s", job["company"], job["title"], e)
         return dict(_DEFAULT_ANALYSIS)
 
 
+def analysis_screening_tier(job: dict) -> str:
+    """Resolve the persisted tier after considering a newly hydrated JD."""
+    persisted = str(job.get("screening_tier") or "").strip().upper()
+    local = local_screening_tier(job)
+    if persisted == "C":
+        return "C"
+    if persisted == "A" or local == "A":
+        return "A"
+    return "B"
+
+
+def _analysis_priority(job: dict) -> tuple[int, int]:
+    """Rank capped Pro candidates by concrete local evidence."""
+    title = str(job.get("title") or "")
+    body = str(job.get("jd_raw") or "")
+    combined = f"{title}\n{body}"
+    evidence_hits = sum(
+        bool(pattern.search(combined))
+        for pattern in (_CPP_STACK_RE, _TEST_STACK_RE, _ROBOT_VISION_EVIDENCE_RE)
+    )
+    direct_title = sum(
+        bool(pattern.search(title))
+        for pattern in (_DIRECT_CPP_TITLE_RE, _ROBOT_VISION_TITLE_RE, _TEST_TITLE_RE)
+    )
+    return direct_title, evidence_hits
+
+
+def _can_hydrate_to_tier_a(job: dict) -> bool:
+    """Return whether a sparse B row could become A after fetching its JD."""
+    if not job_cohorts.is_confirmed_current(job):
+        return False
+    incomplete = job_details.is_jd_incomplete(job)
+    durable_unavailable = str(job.get("jd_status") or "") in {
+        "official_unavailable",
+        "official_sparse",
+        "list_only",
+    }
+    retry_cooldown = False
+    if str(job.get("jd_status") or "") == "fetch_failed":
+        try:
+            checked_at = datetime.fromisoformat(str(job.get("jd_checked_at") or ""))
+            retry_days = max(1, int(os.environ.get("JD_RETRY_DAYS", "7")))
+            retry_cooldown = datetime.now() - checked_at < timedelta(days=retry_days)
+        except (TypeError, ValueError):
+            retry_cooldown = False
+    if analysis_screening_tier(job) == "A":
+        if incomplete and (durable_unavailable or retry_cooldown):
+            return False
+        return True
+    if not incomplete:
+        return False
+    if durable_unavailable or retry_cooldown:
+        return False
+    title = str(job.get("title") or "")
+    return any(
+        pattern.search(title)
+        for pattern in (
+            _DIRECT_CPP_TITLE_RE,
+            _ROBOT_VISION_TITLE_RE,
+            _TEST_TITLE_RE,
+            _SOFTWARE_TITLE_RE,
+        )
+    )
+
+
+def needs_detailed_analysis(conn, job: dict, profile: dict, model: str) -> bool:
+    """Return whether a job should enter the JD hydration/Pro queue."""
+    return (
+        needs_analysis(conn, job, profile, model)
+        and job_cohorts.is_confirmed_current(job)
+        and job_filters.is_formal_campus_job(job)
+        and not job_filters.is_direction_out_job(job)
+        and _can_hydrate_to_tier_a(job)
+    )
+
+
 def batch_analyze(
     jobs: list[dict],
     profile: dict,
     conn,
-    model: str = _DEFAULT_MODEL,
+    model: str = _DEFAULT_ANALYSIS_MODEL,
     max_tokens: int = _DEFAULT_MAX_TOKENS,
+    hydrate: bool = True,
+    max_jobs: int | None = None,
+    max_jobs_per_day: int | None = None,
 ) -> list[dict]:
-    # 主线程预过滤已分析的（DB 读，避免重复调 API）
-    pending = [j for j in jobs if not db_module.has_analysis(conn, j["id"])]
+    pending = [j for j in jobs if needs_analysis(conn, j, profile, model)]
     if not pending:
         return []
+
+    prefiltered = [
+        job for job in pending
+        if job_cohorts.is_confirmed_current(job)
+        and job_filters.is_formal_campus_job(job)
+        and not job_filters.is_direction_out_job(job)
+    ]
+    excluded_before_hydration = len(pending) - len(prefiltered)
+    if excluded_before_hydration:
+        logger.warning(
+            "预筛识别到 %d 个非确认27届、实习/提前批/社招或方向外岗位，"
+            "不补 JD、不调用 Pro",
+            excluded_before_hydration,
+        )
+    initial_pro_candidates = [
+        job for job in prefiltered
+        if analysis_screening_tier(job) == "A"
+    ]
+    upgrade_candidates = [
+        job for job in prefiltered
+        if analysis_screening_tier(job) == "B"
+        and _can_hydrate_to_tier_a(job)
+    ]
+    pro_candidates = initial_pro_candidates + upgrade_candidates
+    skipped_tier_b = len(prefiltered) - len(initial_pro_candidates)
+    if skipped_tier_b:
+        logger.info(
+            "分级预筛保留 %d 个 B 档岗位展示；其中 %d 个强标题稀疏 JD 允许先补全复核",
+            skipped_tier_b,
+            len(upgrade_candidates),
+        )
+    if not pro_candidates:
+        return []
+
+    complete = []
+    hydration_candidates = [
+        job for job in pro_candidates if job_details.is_jd_incomplete(job)
+    ]
+    if hydration_candidates and hydrate:
+        logger.info("细分析前补抓 %d 个不完整 JD", len(hydration_candidates))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_JD_HYDRATE_WORKERS) as ex:
+            futures = {ex.submit(job_details.fetch_full_job_description, job): job for job in hydration_candidates}
+            for future in concurrent.futures.as_completed(futures):
+                job = futures[future]
+                try:
+                    detail = future.result()
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("岗位详情补抓异常 [%s %s]: %s", job["company"], job["title"], e)
+                    detail = ""
+                if detail:
+                    db_module.update_job_jd(
+                        conn,
+                        job["id"],
+                        detail,
+                        jd_url=job.get("jd_url"),
+                        link_kind=job.get("link_kind"),
+                    )
+                    job["jd_raw"] = detail
+
+        complete = [
+            job for job in pro_candidates if not job_details.is_jd_incomplete(job)
+        ]
+    elif hydration_candidates:
+        complete = [
+            job for job in pro_candidates if not job_details.is_jd_incomplete(job)
+        ]
+    else:
+        complete = pro_candidates
+
+    jd_incomplete_count = sum(
+        job_details.is_jd_incomplete(job) for job in pro_candidates
+    )
+    if jd_incomplete_count:
+        logger.warning("跳过 %d 个仍缺少完整 JD 的岗位，不调用 Pro", jd_incomplete_count)
+
+    eligible = [
+        job for job in complete
+        if job_filters.is_formal_campus_job(job)
+        and not job_filters.is_direction_out_job(job)
+    ]
+    excluded_after_hydration = len(complete) - len(eligible)
+    if excluded_after_hydration:
+        logger.warning(
+            "JD 补全后识别到 %d 个实习/提前批/社招或方向外岗位，不调用 Pro",
+            excluded_after_hydration,
+        )
+    complete = [
+        job for job in eligible if analysis_screening_tier(job) == "A"
+    ]
+
+    if not complete:
+        return []
+
+    complete.sort(key=_analysis_priority, reverse=True)
+    run_limit = max_jobs if max_jobs and max_jobs > 0 else None
+    if max_jobs_per_day and max_jobs_per_day > 0:
+        analyzed_today = conn.execute(
+            """SELECT COUNT(*) FROM job_analysis
+               WHERE model = ? AND date(analyzed_at) = date('now', 'localtime')""",
+            (model,),
+        ).fetchone()[0]
+        daily_remaining = max(0, max_jobs_per_day - analyzed_today)
+        run_limit = daily_remaining if run_limit is None else min(run_limit, daily_remaining)
+    if run_limit is not None and len(complete) > run_limit:
+        logger.warning(
+            "Pro 硬限制生效：候选 %d 个，本次仅分析前 %d 个，其余留待后续确认",
+            len(complete), run_limit,
+        )
+        complete = complete[:run_limit]
+    if not complete:
+        logger.warning("今日 Pro 分析额度已用完，本次不调用模型")
+        return []
+    logger.warning(
+        "Pro 调用预算：本次 %d 个岗位，单条输出上限 %d Token，"
+        "输出上限合计 %d Token（不含输入）",
+        len(complete), max_tokens, len(complete) * max_tokens,
+    )
 
     # analyze_job 是纯 DeepSeek API 调用（不碰 conn）→ 可并发；DB 写回放主线程串行（SQLite 安全）。
     results = []
     failed = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=_ANALYZE_WORKERS) as ex:
-        fut_to_job = {ex.submit(analyze_job, j, profile, model, max_tokens): j for j in pending}
+        fut_to_job = {ex.submit(analyze_job, j, profile, model, max_tokens): j for j in complete}
         for fut in concurrent.futures.as_completed(fut_to_job):
             job = fut_to_job[fut]
             try:
@@ -487,6 +1035,9 @@ def batch_analyze(
                 continue
             # 失败兜底分析不写库 → 下次 has_analysis 仍 False → 自动重试
             if analysis.get("summary") == _DEFAULT_ANALYSIS["summary"]:
+                failed += 1
+                continue
+            if analysis.get("analysis_status") != "complete":
                 failed += 1
                 continue
             db_module.save_analysis(conn, job["id"], analysis)  # 主线程，SQLite 安全

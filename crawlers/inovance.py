@@ -69,12 +69,11 @@ class InovanceRecruitCrawler(BaseCrawler):
                     for location in (record.get("workLocation") or [])
                     if isinstance(location, dict) and location.get("name")
                 ]
+                duties = str(record.get("jobDescription") or "").strip()
+                requirements = str(record.get("jobRequirement") or "").strip()
                 jd_raw = "\n".join(
-                    part for part in (
-                        record.get("jobDescription") or "",
-                        record.get("jobRequirement") or "",
-                    ) if part
-                )[:5000]
+                    part for part in ("岗位职责", duties, "任职要求", requirements) if part
+                )[:12000]
                 jobs.append(self._make_job(
                     title=title,
                     city=" / ".join(cities),

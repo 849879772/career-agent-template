@@ -44,7 +44,7 @@ class UnitreeCrawler(BaseCrawler):
             return []
 
         jobs = []
-        for a in anchors[:50]:
+        for a in anchors:
             title_el = a.find("p", class_="title")
             if not title_el:
                 continue
