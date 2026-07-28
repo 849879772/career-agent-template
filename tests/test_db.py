@@ -185,6 +185,39 @@ def test_find_job_id_matches_url_or_company_title_city():
     assert db.find_job_id(conn, {**job, "jd_url": "https://example.com/job/new"}) == job_id
     conn.close()
 
+
+def test_backfill_job_cohorts_preserves_attached_tencent_evidence():
+    conn = db.init_db(TEST_DB)
+    job = {
+        "company": "智元机器人",
+        "title": "具身智能算法工程师",
+        "city": "上海",
+        "job_type": "校招",
+        "jd_url": "https://example.com/job/zhiyuan",
+        "jd_raw": "负责具身智能算法开发",
+        "published_at": "",
+        "source": "智元机器人",
+    }
+    _, job_id = db.upsert_job(conn, job)
+    companies = [{
+        "name": "智元机器人",
+        "source_cohort": 2027,
+        "source_cohort_source": "腾讯文档27届秋招",
+        "source_cohort_evidence": "智元机器人：27届秋招",
+        "source_cohort_url": "https://docs.qq.com/example",
+    }]
+
+    counts = db.backfill_job_cohorts(conn, companies)
+    row = conn.execute(
+        "SELECT cohort, cohort_status, cohort_source FROM jobs WHERE id = ?",
+        (job_id,),
+    ).fetchone()
+
+    assert counts["current"] == 1
+    assert tuple(row) == (2027, "confirmed", "腾讯文档27届秋招")
+    conn.close()
+
+
 def test_insert_job_new():
     conn = db.init_db(TEST_DB)
     job = {

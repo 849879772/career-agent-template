@@ -351,20 +351,32 @@ def update_job_cohort(conn: sqlite3.Connection, job_id: int, job: dict) -> None:
     conn.commit()
 
 
-def backfill_job_cohorts(conn: sqlite3.Connection) -> dict[str, int]:
-    """Classify legacy rows from their existing official job fields."""
+def backfill_job_cohorts(
+    conn: sqlite3.Connection,
+    companies: list[dict] | None = None,
+) -> dict[str, int]:
+    """Classify legacy rows using job fields and attached company evidence."""
     import job_cohorts
 
     rows = [dict(row) for row in conn.execute("SELECT * FROM jobs").fetchall()]
     decisions = []
+    config_by_name = {
+        str(item.get("name") or ""): item
+        for item in (companies or [])
+        if str(item.get("name") or "")
+    }
     grouped: dict[str, list[dict]] = {}
     for row in rows:
         grouped.setdefault(str(row.get("company") or ""), []).append(row)
-    for company_rows in grouped.values():
+    for company_name, company_rows in grouped.items():
+        trusted_campaign = job_cohorts.trusted_source_campaign(
+            config_by_name.get(company_name) or {}
+        )
         decisions.extend(
             job_cohorts.annotate_company_jobs(
                 company_rows,
                 inspect_page=False,
+                campaign=trusted_campaign,
             )
         )
     counts = {"current": 0, "previous": 0, "unknown": 0}

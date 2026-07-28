@@ -242,7 +242,7 @@ def main():
     purged = db_module.purge_nonformal_campus_jobs(conn)
     purged_direction_out = db_module.purge_direction_out_jobs(conn)
     purged_incomplete_analysis = db_module.purge_incomplete_jd_analyses(conn)
-    cohort_backfill = db_module.backfill_job_cohorts(conn)
+    cohort_backfill = db_module.backfill_job_cohorts(conn, config["companies"])
     purged_noncurrent_analysis = db_module.purge_noncurrent_cohort_analyses(conn)
     if migrated_jd_links:
         logger.info("Repaired %d legacy JD detail links", migrated_jd_links)
