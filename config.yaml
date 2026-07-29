@@ -1404,6 +1404,10 @@ companies:
 - name: 高标科技
   careers_url: https://kjgb.zhiye.com/campus/jobs?shareId=3cef82ab-bf24-4225-9f23-ee18ced3ce45&shareSource=2
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "聚宽投资"
+  careers_url: "https://app.mokahr.com/m/campus_apply/joinquant/92347?recommendCode=DS86UpyF#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro

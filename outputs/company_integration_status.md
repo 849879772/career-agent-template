@@ -1037,5 +1037,5 @@
 <!-- TENCENT_DOCS_AUTO_ONBOARDING_START -->
 | 公司 | 腾讯文档链接 | 识别爬虫 | 状态 | 原因 |
 | --- | --- | --- | --- | --- |
-| 柠檬微趣-下周官宣 | https://app.mokahr.com/su/tergdo | `moka` | 已接入 | 已解析至官方 Moka 项目并真实抓取 30 个岗位 |
+| 无 | - | - | - | 当前腾讯文档新线索均已自动验证并接入 |
 <!-- TENCENT_DOCS_AUTO_ONBOARDING_END -->
