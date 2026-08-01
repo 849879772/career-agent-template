@@ -1412,6 +1412,10 @@ companies:
 - name: "九坤投资"
   careers_url: "https://app.mokahr.com/m/campus-recruitment/ubiquantrecruit/37031?recommendCode=DSThDarV#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "4399游戏"
+  careers_url: "https://hr.4399om.com/weixin/?r=job/agent&type=2&isOpen=0&jobTableType=1&code=ctg5d"
+  crawler: render
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
