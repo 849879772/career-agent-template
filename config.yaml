@@ -1416,6 +1416,16 @@ companies:
 - name: "4399游戏"
   careers_url: "https://hr.4399om.com/weixin/?r=job/agent&type=2&isOpen=0&jobTableType=1&code=ctg5d"
   crawler: render
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "创维集团"
+  careers_url: "https://wecruit.hotjob.cn/SU668e3a541eb8050602c1b176/mc/position/campus?acotycoCode=eojtgn&recruitType=1&isLimitShowPostScope=0"
+  crawler: hotjob
+- name: "哔哩哔哩"
+  careers_url: "https://jobs.bilibili.com/campus/positions?token=a337cd2c-d038-411f-ba8a-0b1abf661f06"
+  crawler: render
+- name: "阿里淘天"
+  careers_url: "https://campus-talent.alibaba.com/campus/position?campusShareCode=hmSBcg4U%2FkdbfPRQ42bRwDcfBaJ2CesAlc%2FvqOMYbBymmzBp0pRZjHku53ln26c1&batchId=100000760001"
+  crawler: render
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
