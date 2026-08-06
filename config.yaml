@@ -1426,6 +1426,10 @@ companies:
 - name: "阿里淘天"
   careers_url: "https://campus-talent.alibaba.com/campus/position?campusShareCode=hmSBcg4U%2FkdbfPRQ42bRwDcfBaJ2CesAlc%2FvqOMYbBymmzBp0pRZjHku53ln26c1&batchId=100000760001"
   crawler: render
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "阿里云瓴羊"
+  careers_url: "https://alidocs.dingtalk.com/notable/share/form/v01eYVOL5ozy48eAlpz_dv19yqvsgs3oebp3pcjys_1qX0QQ0?utm_source=qrcode_form&source=qrcode"
+  crawler: render
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
