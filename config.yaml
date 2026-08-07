@@ -1430,6 +1430,22 @@ companies:
 - name: "阿里云瓴羊"
   careers_url: "https://alidocs.dingtalk.com/notable/share/form/v01eYVOL5ozy48eAlpz_dv19yqvsgs3oebp3pcjys_1qX0QQ0?utm_source=qrcode_form&source=qrcode"
   crawler: render
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "寒武纪"
+  careers_url: "https://app.mokahr.com/recommendation-apply/cambricon/46261?sharePageId=4679744&recommendCode=NTABY2t&codeType=1#/recommendation/page/4679744"
+  crawler: moka
+- name: "搜狐集团-AI专项"
+  careers_url: "https://app.mokahr.com/m/campus_apply/sohu/36036?recommendCode=DSRxwjqx#/jobs"
+  crawler: moka
+- name: "阿里-蚂蚁集团"
+  careers_url: "https://hrrecommend.antgroup.com/job-list.html?source=campus_external_recommend&code=T_dN2oDMsas%2F7M1pcbeNZgPQyH2sYJEaioT37binMeo%3D"
+  crawler: render
+- name: "鸿擎科技"
+  careers_url: "https://qcnhg4ksaiwt.jobs.feishu.cn/257870/m/?external_referral_code=92AJ8US"
+  crawler: feishu
+- name: "鹰角网络"
+  careers_url: "https://app.mokahr.com/m/recommendation-apply/hypergryph/26594?sharePageId=4654413&amp;recommendCode=NTA6WPs&amp;codeType=1#/recommendation/page/4654413"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
