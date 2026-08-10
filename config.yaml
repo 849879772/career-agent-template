@@ -1446,6 +1446,19 @@ companies:
 - name: "鹰角网络"
   careers_url: "https://app.mokahr.com/m/recommendation-apply/hypergryph/26594?sharePageId=4654413&amp;recommendCode=NTA6WPs&amp;codeType=1#/recommendation/page/4654413"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "CVTE视源股份"
+  careers_url: "https://campus.cvte.com"
+  crawler: render
+- name: "ZURU"
+  careers_url: "https://wecruit.hotjob.cn/SU69fd8f7f1f17c372512fdd19/mc/position/campus?acotycoCode=cjsbom&projectId=100501&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "宇石空间"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/astronstone/168327?recommendCode=DS9marHm#/jobs"
+  crawler: moka
+- name: "深蓝互动"
+  careers_url: "https://app.mokahr.com/m/campus_apply/blueinteractive/38434?recommendCode=DSZtcZQB#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro

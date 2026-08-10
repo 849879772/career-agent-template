@@ -1037,5 +1037,5 @@
 <!-- TENCENT_DOCS_AUTO_ONBOARDING_START -->
 | 公司 | 腾讯文档链接 | 识别爬虫 | 状态 | 原因 |
 | --- | --- | --- | --- | --- |
-| 无 | - | - | - | 当前腾讯文档新线索均已自动验证并接入 |
+| MDPI | https://mdpi.cn/career/recruit/ca-recruit/position?email=3341436634@qq.com | `render` | 待人工接入 | render 返回 0 个岗位 |
 <!-- TENCENT_DOCS_AUTO_ONBOARDING_END -->
