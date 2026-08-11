@@ -1459,6 +1459,13 @@ companies:
 - name: "深蓝互动"
   careers_url: "https://app.mokahr.com/m/campus_apply/blueinteractive/38434?recommendCode=DSZtcZQB#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "凡岛"
+  careers_url: "https://job.fandow.com/home?pushCode=XRN8AF9"
+  crawler: render
+- name: "巨一科技"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/ahjy/168235?recommendCode=DSPQjhw2#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
