@@ -1470,6 +1470,16 @@ companies:
 - name: "点点互动"
   careers_url: "https://ddhd.cn/campus/jobs?shareId=3b4bf1d5-e3dc-448d-8434-53baa5d29cfd&shareSource=1"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "OBSBOT寻影"
+  careers_url: "https://n8r2cr07gk.jobs.feishu.cn/s/4eHpfEDiOXo"
+  crawler: feishu
+- name: "卡方科技"
+  careers_url: "https://kafangtech.jobs.feishu.cn/s/61hqmxKBKTw"
+  crawler: feishu
+- name: "自变量机器人"
+  careers_url: "https://x2-robot.jobs.feishu.cn/s/cr-OoWdwAvM"
+  crawler: feishu
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
