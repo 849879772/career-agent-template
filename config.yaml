@@ -1480,6 +1480,22 @@ companies:
 - name: "自变量机器人"
   careers_url: "https://x2-robot.jobs.feishu.cn/s/cr-OoWdwAvM"
   crawler: feishu
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "三七互娱"
+  careers_url: "https://app.mokahr.com/m/campus_apply/37/58016?recommendCode=DSjnn8dk#/jobs"
+  crawler: moka
+- name: "卧安机器人"
+  careers_url: "https://woanhome.zhiye.com/campus/jobs?shareId=d120f246-ea82-4010-ab9a-b58bd85ebf87&shareSource=2"
+  crawler: beisen
+- name: "大参林医药集团"
+  careers_url: "https://app.mokahr.com/m/campus_apply/dslyy/136052?recommendCode=DSUzgyFM&hash=%23%2Fjobs#/jobs"
+  crawler: moka
+- name: "新能安"
+  careers_url: "https://wecruit.hotjob.cn/SU6618fd381eb8053acd5fc2b9/mc/position/campus?acotycoCode=uozkbk&projectId=505401%2C505501&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "理想汽车"
+  careers_url: "https://li.jobs.feishu.cn/s/tJF4dkXEZkI"
+  crawler: feishu
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
