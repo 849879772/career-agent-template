@@ -1496,6 +1496,10 @@ companies:
 - name: "理想汽车"
   careers_url: "https://li.jobs.feishu.cn/s/tJF4dkXEZkI"
   crawler: feishu
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "腾讯音乐"
+  careers_url: "https://join.tencentmusic.com/campus/post?type=10"
+  crawler: render
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
