@@ -1500,6 +1500,10 @@ companies:
 - name: "腾讯音乐"
   careers_url: "https://join.tencentmusic.com/campus/post?type=10"
   crawler: render
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "小米集团"
+  careers_url: "https://xiaomi.jobs.f.mioffice.cn/s/_3y3FqDMDQ8"
+  crawler: feishu
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
