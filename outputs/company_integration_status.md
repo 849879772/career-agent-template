@@ -1038,4 +1038,5 @@
 | 公司 | 腾讯文档链接 | 识别爬虫 | 状态 | 原因 |
 | --- | --- | --- | --- | --- |
 | MDPI | https://mdpi.cn/career/recruit/ca-recruit/position?email=3341436634@qq.com | `render` | 待人工接入 | render 返回 0 个岗位 |
+| 三环集团 | https://hr.cctc.cc/school?sourceCode=869573&isRecommendCode=true | `render` | 待人工接入 | render 返回 0 个岗位 |
 <!-- TENCENT_DOCS_AUTO_ONBOARDING_END -->

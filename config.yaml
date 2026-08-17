@@ -1504,6 +1504,16 @@ companies:
 - name: "小米集团"
   careers_url: "https://xiaomi.jobs.f.mioffice.cn/s/_3y3FqDMDQ8"
   crawler: feishu
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "招银云创"
+  careers_url: "https://app.mokahr.com/m/campus_apply/mbcloud/150116?recommendCode=DSQ3A12u#/jobs"
+  crawler: moka
+- name: "波克"
+  careers_url: "https://boke.jobs.feishu.cn/s/FdZL0oHPUYg"
+  crawler: feishu
+- name: "鹏芯微"
+  careers_url: "https://career.pxwsemi.com/campus/jobs?shareId=b7ba1868-3017-4fbc-beb4-6fa0733a2d2d&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
