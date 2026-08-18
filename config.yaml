@@ -1514,6 +1514,10 @@ companies:
 - name: "鹏芯微"
   careers_url: "https://career.pxwsemi.com/campus/jobs?shareId=b7ba1868-3017-4fbc-beb4-6fa0733a2d2d&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "库洛游戏"
+  careers_url: "https://kurogame.jobs.feishu.cn/s/UqN6u_LslXA"
+  crawler: feishu
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
