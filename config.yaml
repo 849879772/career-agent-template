@@ -1518,6 +1518,10 @@ companies:
 - name: "库洛游戏"
   careers_url: "https://kurogame.jobs.feishu.cn/s/UqN6u_LslXA"
   crawler: feishu
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "Sea"
+  careers_url: "https://app.mokahr.com/m/campus_apply/garena/148076?recommendCode=DSQq22fM#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
