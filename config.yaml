@@ -1522,6 +1522,13 @@ companies:
 - name: "Sea"
   careers_url: "https://app.mokahr.com/m/campus_apply/garena/148076?recommendCode=DSQq22fM#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "MetaApp"
+  careers_url: "https://meta.jobs.feishu.cn/s/epYBFZjBD4k"
+  crawler: feishu
+- name: "千里科技"
+  careers_url: "https://app.mokahr.com/m/campus_apply/qianli1/147197?recommendCode=DSunz6Nt#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
