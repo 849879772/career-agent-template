@@ -1529,6 +1529,16 @@ companies:
 - name: "千里科技"
   careers_url: "https://app.mokahr.com/m/campus_apply/qianli1/147197?recommendCode=DSunz6Nt#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "博众精工"
+  careers_url: "https://bozhon3.zhiye.com/campus/jobs?shareId=945f5d01-429c-4a55-ba17-128798f145bf&shareSource=2"
+  crawler: beisen
+- name: "富特科技"
+  careers_url: "https://app.mokahr.com/campus_apply/evtech/47503?recommendCode=DS5HrUX6#/jobs"
+  crawler: moka
+- name: "禾迈股份"
+  careers_url: "https://app.mokahr.com/campus-recruitment/hoymiles/70377?recommendCode=DSHcSR6p#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
