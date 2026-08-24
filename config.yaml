@@ -1543,6 +1543,13 @@ companies:
 - name: "杰瑞集团"
   careers_url: "https://future.jereh.com/campus/jobs?shareId=9c94dbea-93bf-4a5e-b2ad-eca3e586bd15&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "TCL华星"
+  careers_url: "https://wecruit.hotjob.cn/SU6491506a2f9d24316e91b81b/mc/position/campus?acotycoCode=ndwsgd&orgId=100801%2C104101&projectId=308501&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "春风动力"
+  careers_url: "https://cfmoto.zhiye.com/campus/jobs?shareId=d6e4e863-ab41-4ef3-b95c-e5625950bedc&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
