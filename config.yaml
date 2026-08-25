@@ -1550,6 +1550,19 @@ companies:
 - name: "春风动力"
   careers_url: "https://cfmoto.zhiye.com/campus/jobs?shareId=d6e4e863-ab41-4ef3-b95c-e5625950bedc&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "海能达通信"
+  careers_url: "https://app.mokahr.com/campus_apply/hytera/182194?recommendCode=DSnApMzB#/jobs"
+  crawler: moka
+- name: "科华集团"
+  careers_url: "https://app.mokahr.com/campus_apply/kehua/92510?recommendCode=DSHV5wbF#/jobs"
+  crawler: moka
+- name: "诗悦网络"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/shiyuehr/72055?recommendCode=DS2gf3y9#/jobs"
+  crawler: moka
+- name: "赢合科技"
+  careers_url: "https://yhwins2.zhiye.com/campus/jobs?shareId=8848ae0a-ca33-49f3-80a1-8e6153760225&shareSource=2&qr=1&memory=%7B%7D&silence=1"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
