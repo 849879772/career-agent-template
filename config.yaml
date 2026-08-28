@@ -1573,6 +1573,16 @@ companies:
 - name: "扬腾创新"
   careers_url: "https://yangtenginnovation-compus.zhiye.com/campus/jobs?shareId=8c456ab5-f1c8-46cd-8a91-037d42e2bcaa&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "九牧集团"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/jomoo/142937?recommendCode=DSYnYM2x#/jobs"
+  crawler: moka
+- name: "李森智能"
+  careers_url: "https://lisen.zhiye.com/campus/jobs?shareId=533d1cff-a525-46dc-8c5d-46445deabad4&shareSource=2"
+  crawler: beisen
+- name: "江苏海四达电源"
+  careers_url: "https://highstar.zhiye.com/campus/jobs?shareId=0619c7c1-77c4-40bd-808c-60d38fffdeac&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
