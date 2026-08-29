@@ -1583,6 +1583,13 @@ companies:
 - name: "江苏海四达电源"
   careers_url: "https://highstar.zhiye.com/campus/jobs?shareId=0619c7c1-77c4-40bd-808c-60d38fffdeac&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "奥克斯集团"
+  careers_url: "https://auxgroup.zhiye.com/campus/jobs?shareId=6275af13-0f7f-4634-b26f-7f02dea33054&shareSource=2"
+  crawler: beisen
+- name: "轻舟智航"
+  careers_url: "https://qcraft.jobs.feishu.cn/s/yxH8NMS4XGc"
+  crawler: feishu
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
