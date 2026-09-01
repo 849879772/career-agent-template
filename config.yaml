@@ -1590,6 +1590,22 @@ companies:
 - name: "轻舟智航"
   careers_url: "https://qcraft.jobs.feishu.cn/s/yxH8NMS4XGc"
   crawler: feishu
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "四方继保"
+  careers_url: "https://sf-auto1.zhiye.com/campus/jobs?shareId=86f02a13-0c23-4938-bbae-7c09c9ed3324&shareSource=2"
+  crawler: beisen
+- name: "国泰汉帛"
+  careers_url: "https://jvvyvrptdzz.jobs.feishu.cn/972701/m/position/list?external_referral_code=1M4TA4A"
+  crawler: feishu
+- name: "易点云"
+  careers_url: "https://recruit-pro.edianyun.com/#/wap/recruitment-collect"
+  crawler: render
+- name: "雷赛智能"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/leisai/146886?recommendCode=DSaBjkyH#/jobs"
+  crawler: moka
+- name: "飞步科技"
+  careers_url: "https://app.mokahr.com/campus-recruitment/fabu/56114?recommendCode=DSgZsTrZ#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
