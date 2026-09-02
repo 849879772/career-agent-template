@@ -1606,6 +1606,22 @@ companies:
 - name: "飞步科技"
   careers_url: "https://app.mokahr.com/campus-recruitment/fabu/56114?recommendCode=DSgZsTrZ#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "万辰集团（好想来）"
+  careers_url: "https://vanchen1.zhiye.com/campus/jobs?shareId=14ffc5ce-1b26-47c7-b80b-05719510dade&shareSource=2"
+  crawler: beisen
+- name: "卓胜微电子"
+  careers_url: "https://maxscend.zhiye.com/campus/jobs?shareId=538ec1bd-204d-4562-828f-4915ebe319a0&shareSource=2"
+  crawler: beisen
+- name: "正浩EcoFlow"
+  careers_url: "https://jobs.ecoflow.com/s/ZyFxOlW1sLI"
+  crawler: render
+- name: "瑞声科技"
+  careers_url: "https://talent.aactechnologies.com/campus/m/position/list?external_referral_code=8RY44XV"
+  crawler: render
+- name: "银泰商业"
+  careers_url: "http://talent.intime.com.cn/campus/jobs?shareId=48780f33-941e-46a4-814d-9799f9112248&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
