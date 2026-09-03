@@ -1622,6 +1622,16 @@ companies:
 - name: "银泰商业"
   careers_url: "http://talent.intime.com.cn/campus/jobs?shareId=48780f33-941e-46a4-814d-9799f9112248&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "图拉斯（原蓝禾）"
+  careers_url: "https://lanhevip.jobs.feishu.cn/s/A4zAkYMD9Xs"
+  crawler: feishu
+- name: "牧原集团"
+  careers_url: "https://app.mokahr.com/campus_apply/muyuan/70116?recommendCode=DSCHtb4w#/jobs"
+  crawler: moka
+- name: "象屿股份"
+  careers_url: "https://xiangyu.zhiye.com/campus/jobs?shareId=04ba3846-f95d-4166-84f0-f7ae96c29fe1&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
