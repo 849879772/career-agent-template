@@ -1040,8 +1040,8 @@
 | MDPI | https://mdpi.cn/career/recruit/ca-recruit/position?email=3341436634@qq.com | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 三环集团 | https://hr.cctc.cc/school?sourceCode=869573&isRecommendCode=true | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 友塔游戏 | https://www.yottagames.com.cn/zh/internal-recommendation?token=480b3cd4a66863e82cb4e2bc1fd60a45-999602-1093058550&sub=077 | `render` | 待人工接入 | render 返回 0 个岗位 |
+| 吉比特-雷霆游戏 | https://hr.g-bits.com/web/index.html#/post-web/post-list/?referralCode=FH386S | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 帆软 | https://t6ixa9nyl6.jiandaoyun.com/f/65e1a1308ce7672fded0f0cf?ext=CDSXJ | `render` | 待人工接入 | render 返回 0 个岗位 |
-| 爱迪特Aidite | https://www.aidite.com/zh/positionPage | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 网易互联网 | https://campus.163.com/bolehtml/home?projectId=103&type=99&boleId=e1dd4e319e73d68a&boleType=2&signature=133fad406699e30097ce17c376500d6c&isShare=1 | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 联合利华 | https://xym.51job.com/VueData/neitui/user/#/?ehireid=8833740&prd=xyznt&ruid=162491&referrer=o0cn56rchou82EDTyJc1LYCY0txw | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 龙湖集团华西地区 | https://点击后面图片投递内推 | `render` | 待人工接入 | render 返回 0 个岗位 |

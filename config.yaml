@@ -1632,6 +1632,25 @@ companies:
 - name: "象屿股份"
   careers_url: "https://xiangyu.zhiye.com/campus/jobs?shareId=04ba3846-f95d-4166-84f0-f7ae96c29fe1&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "天赐材料"
+  careers_url: "https://wecruit.hotjob.cn/SU62c3ea6b2f9d241e4c8e45ba/mc/position/campus?acotycoCode=qsjehk&projectId=201701&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "思摩尔"
+  careers_url: "https://app.mokahr.com/campus_apply/smoore/150918?recommendCode=DS8x9P6R#/jobs"
+  crawler: moka
+- name: "极兔速递"
+  careers_url: "https://jtexpress.jobs.feishu.cn/s/au-hRT9NM5E"
+  crawler: feishu
+- name: "爱迪特Aidite"
+  careers_url: "https://www.aidite.com/zh/positionPage"
+  crawler: render
+- name: "途虎养车"
+  careers_url: "https://app.mokahr.com/campus_apply/tuhu/28398?recommendCode=DS3hMB6E#/jobs"
+  crawler: moka
+- name: "黑白调-傲风"
+  careers_url: "https://app.mokahr.com/campus_apply/heibaidiao/54126?recommendCode=DSBjx3ZQ#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
