@@ -1651,6 +1651,25 @@ companies:
 - name: "黑白调-傲风"
   careers_url: "https://app.mokahr.com/campus_apply/heibaidiao/54126?recommendCode=DSBjx3ZQ#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "冠宇集团"
+  careers_url: "https://cosmx.zhiye.com/campus/jobs?shareId=81f58b1a-e7be-43bf-87da-b2077ca1601e&shareSource=2"
+  crawler: beisen
+- name: "巨人网络"
+  careers_url: "https://app.mokahr.com/campus-recruitment/ztgame/92438?recommendCode=DS8cb6eu#/jobs"
+  crawler: moka
+- name: "智驾新程 neueHCT"
+  careers_url: "https://neuehct.jobs.feishu.cn/s/da663t3OFv4"
+  crawler: feishu
+- name: "特锐德"
+  careers_url: "https://tgood.zhiye.com/campus/jobs?shareId=1eb59034-b367-4225-b950-c6366cff7d78&shareSource=2"
+  crawler: beisen
+- name: "英科再生"
+  careers_url: "https://global-intco.jobs.feishu.cn/s/GPVzkGAwcl0"
+  crawler: feishu
+- name: "骑士集团"
+  careers_url: "https://app.mokahr.com/campus_apply/black-unique/29232?recommendCode=DSv6KdHC#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro

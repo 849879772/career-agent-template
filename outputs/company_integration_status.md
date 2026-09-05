@@ -1042,6 +1042,7 @@
 | 友塔游戏 | https://www.yottagames.com.cn/zh/internal-recommendation?token=480b3cd4a66863e82cb4e2bc1fd60a45-999602-1093058550&sub=077 | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 吉比特-雷霆游戏 | https://hr.g-bits.com/web/index.html#/post-web/post-list/?referralCode=FH386S | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 帆软 | https://t6ixa9nyl6.jiandaoyun.com/f/65e1a1308ce7672fded0f0cf?ext=CDSXJ | `render` | 待人工接入 | render 返回 0 个岗位 |
+| 浪潮集团 | https://wx64310b3064348282.hcmcloud.cn/recruit#/common_model_nav_anonymous/multi?c_model=_HB4_UmVsZWFzZUpvYk1ncg%253D%253D&meta_state=_HB4_aW50ZXJuYWxfY2FuZGlkYXRl&advance_filter_dict=%7B%22job_class%22:%22%E6%A0%A1%E5%9B%AD%E6%8B%9B%E8%81%98%22,%22select_depart%22:false%7D&key=_HB4_cmVjb21tZW5kX2pvYl9saXN0&model=_HB4_UmVjcnVpdFJlY29tbWVuZA%253D%253D&nav_state=_HB4_aW50ZXJuYWxfY2FuZGlkYXRl&custom_params=_HB4_eyJpbnRlcm5hbF9jb2RlIjoieEdpb0pBaCJ9&company_id=_HB4_OA%253D%253D | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 网易互联网 | https://campus.163.com/bolehtml/home?projectId=103&type=99&boleId=e1dd4e319e73d68a&boleType=2&signature=133fad406699e30097ce17c376500d6c&isShare=1 | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 联合利华 | https://xym.51job.com/VueData/neitui/user/#/?ehireid=8833740&prd=xyznt&ruid=162491&referrer=o0cn56rchou82EDTyJc1LYCY0txw | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 龙湖集团华西地区 | https://点击后面图片投递内推 | `render` | 待人工接入 | render 返回 0 个岗位 |
