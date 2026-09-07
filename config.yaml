@@ -1670,6 +1670,10 @@ companies:
 - name: "骑士集团"
   careers_url: "https://app.mokahr.com/campus_apply/black-unique/29232?recommendCode=DSv6KdHC#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "华宝新能"
+  careers_url: "https://career.hello-tech.com/campus/jobs?shareId=33d74670-8143-435a-8b1e-d747781a1f08&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
