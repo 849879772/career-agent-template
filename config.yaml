@@ -1674,6 +1674,13 @@ companies:
 - name: "华宝新能"
   careers_url: "https://career.hello-tech.com/campus/jobs?shareId=33d74670-8143-435a-8b1e-d747781a1f08&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "曦望Sunrise"
+  careers_url: "https://jobs.sunrise-ai.com/s/rdEbUxEZUvo"
+  crawler: render
+- name: "立讯技术"
+  careers_url: "https://luxshare-tech.zhiye.com/campus/jobs?shareId=3f27582d-0e97-4f27-96f4-22048a62f3b4&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
