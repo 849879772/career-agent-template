@@ -1681,6 +1681,16 @@ companies:
 - name: "立讯技术"
   careers_url: "https://luxshare-tech.zhiye.com/campus/jobs?shareId=3f27582d-0e97-4f27-96f4-22048a62f3b4&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "乐信圣文"
+  careers_url: "https://learnings.jobs.feishu.cn/s/nkV6mtflhW4"
+  crawler: feishu
+- name: "众安保险"
+  careers_url: "https://app.mokahr.com/campus_apply/zhongan/71908?recommendCode=DSkZKTjJ#/jobs"
+  crawler: moka
+- name: "高露洁"
+  careers_url: "https://colgate.zhiye.com/campus/jobs?shareId=614d9efe-8b49-4201-ba0e-5021a6f7051f&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
