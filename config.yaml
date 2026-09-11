@@ -1691,6 +1691,19 @@ companies:
 - name: "高露洁"
   careers_url: "https://colgate.zhiye.com/campus/jobs?shareId=614d9efe-8b49-4201-ba0e-5021a6f7051f&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "三棵树"
+  careers_url: "https://wecruit.hotjob.cn/SU6173aef0bef57c4414103348/mc/position/campus?acotycoCode=tydrup&projectId=201401&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "树根互联"
+  careers_url: "https://irootech.zhiye.com/campus/jobs?shareId=80f4049b-f7af-4f8d-bccb-8622eed42879&shareSource=2"
+  crawler: beisen
+- name: "阳光保险"
+  careers_url: "https://sunzhaopin.sinosig.com/campus/jobs?shareId=83e98c36-cb6b-4187-9a5b-9a5ad98b645f&shareSource=2"
+  crawler: beisen
+- name: "黑芝麻智能"
+  careers_url: "https://bsthr.zhiye.com/campus/jobs?shareId=49723520-dbb6-40b1-a6fb-4e25245409cb&shareSource=2"
+  crawler: beisen
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
