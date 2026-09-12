@@ -1704,6 +1704,13 @@ companies:
 - name: "黑芝麻智能"
   careers_url: "https://bsthr.zhiye.com/campus/jobs?shareId=49723520-dbb6-40b1-a6fb-4e25245409cb&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "固德威"
+  careers_url: "https://wecruit.hotjob.cn/SU630a3a0e2f9d2406b4f6c5f1/pb/school.html?acotycoCode=ibychh&projectId=200701&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
+- name: "海天味业"
+  careers_url: "https://wecruit.hotjob.cn/SU6322ee8c0dcad46a862dcbe5/mc/position/campus?acotycoCode=bgpkci&recruitType=1&isLimitShowPostScope=1"
+  crawler: hotjob
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
