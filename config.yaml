@@ -1711,6 +1711,10 @@ companies:
 - name: "海天味业"
   careers_url: "https://wecruit.hotjob.cn/SU6322ee8c0dcad46a862dcbe5/mc/position/campus?acotycoCode=bgpkci&recruitType=1&isLimitShowPostScope=1"
   crawler: hotjob
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "宇通客车"
+  careers_url: "https://app.mokahr.com/su/loawxh"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
