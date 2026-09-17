@@ -1715,6 +1715,13 @@ companies:
 - name: "宇通客车"
   careers_url: "https://app.mokahr.com/su/loawxh"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "太衍私募基金"
+  careers_url: "https://qcnjp4yi4cew.jobs.feishu.cn/s/erHbISmjI9Y"
+  crawler: feishu
+- name: "思谋科技"
+  careers_url: "https://app.mokahr.com/m/campus-recruitment/smartmore/40506?recommendCode=DSBjtnc3#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
