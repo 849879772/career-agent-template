@@ -1722,6 +1722,22 @@ companies:
 - name: "思谋科技"
   careers_url: "https://app.mokahr.com/m/campus-recruitment/smartmore/40506?recommendCode=DSBjtnc3#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "七十迈"
+  careers_url: "https://70mai.zhiye.com/campus/jobs?shareId=ba97fc77-83cc-4735-9b6b-f73832bcab61&shareSource=2"
+  crawler: beisen
+- name: "乐漾"
+  careers_url: "https://careers.joyintoy.cn/s/dQxil--A2rU"
+  crawler: render
+- name: "云览科技"
+  careers_url: "https://cloudview-inc.com/join/jobs?inviteCode=pM3mM"
+  crawler: render
+- name: "冰川网络"
+  careers_url: "https://bingchuan1.zhiye.com/campus/jobs?shareId=96e146eb-c9af-4434-93d6-e68b09b451e9&shareSource=2"
+  crawler: beisen
+- name: "特斯拉"
+  careers_url: "https://app.mokahr.com/campus_apply/tesla/41460?recommendCode=DSs8kUEa#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
