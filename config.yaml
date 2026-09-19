@@ -1738,6 +1738,19 @@ companies:
 - name: "特斯拉"
   careers_url: "https://app.mokahr.com/campus_apply/tesla/41460?recommendCode=DSs8kUEa#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "九方智投"
+  careers_url: "https://vcnuqm4lv2uh.jobs.feishu.cn/s/rQsQe1FhiJo"
+  crawler: feishu
+- name: "云和恩墨"
+  careers_url: "https://app.mokahr.com/campus-recruitment/enmotech/47098#/"
+  crawler: moka
+- name: "大寰机器人"
+  careers_url: "https://app.mokahr.com/campus-recruitment/dhrobotics/168695?recommendCode=DSDJZVaV#/jobs"
+  crawler: moka
+- name: "沐曦股份"
+  careers_url: "https://app.mokahr.com/campus-recruitment/metax-tech/58131?recommendCode=DSjhTZe8#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
