@@ -1039,6 +1039,7 @@
 | --- | --- | --- | --- | --- |
 | MDPI | https://mdpi.cn/career/recruit/ca-recruit/position?email=3341436634@qq.com | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 三环集团 | https://hr.cctc.cc/school?sourceCode=869573&isRecommendCode=true | `render` | 待人工接入 | render 返回 0 个岗位 |
+| 中国通信服务广东公司 | https://iter.stongyw.cn/web/schoolwx/job/index.html?RCode=260040 | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 友塔游戏 | https://www.yottagames.com.cn/zh/internal-recommendation?token=480b3cd4a66863e82cb4e2bc1fd60a45-999602-1093058550&sub=077 | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 吉比特-雷霆游戏 | https://hr.g-bits.com/web/index.html#/post-web/post-list/?referralCode=FH386S | `render` | 待人工接入 | render 返回 0 个岗位 |
 | 帆软 | https://t6ixa9nyl6.jiandaoyun.com/f/65e1a1308ce7672fded0f0cf?ext=CDSXJ | `render` | 待人工接入 | render 返回 0 个岗位 |
