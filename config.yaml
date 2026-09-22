@@ -1751,6 +1751,16 @@ companies:
 - name: "沐曦股份"
   careers_url: "https://app.mokahr.com/campus-recruitment/metax-tech/58131?recommendCode=DSjhTZe8#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "FMG集团"
+  careers_url: "https://app.mokahr.com/campus-recruitment/ur/45210?recommendCode=DShEgnny#/jobs"
+  crawler: moka
+- name: "徐福记"
+  careers_url: "https://app.mokahr.com/campus_apply/hfc-foods/102201?recommendCode=DSPDu3b3#/jobs"
+  crawler: moka
+- name: "路特ROOT"
+  careers_url: "https://app.mokahr.com/m/campus_apply/rootglobal/44850?recommendCode=DS4eY69C#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
