@@ -1765,6 +1765,13 @@ companies:
 - name: "认养一头牛"
   careers_url: "https://ryytn.zhiye.com/campus/jobs?shareId=4685c8fd-55c5-4604-a10a-e405613d7923&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "9377游戏"
+  careers_url: "https://9377.zhiye.com/campus/jobs?shareId=62a2649a-3826-44b2-a0df-667250430806&shareSource=2"
+  crawler: beisen
+- name: "康龙化成"
+  careers_url: "https://app.mokahr.com/m/campus_apply/pharmaron/45318?recommendCode=DSFv5WjR#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
