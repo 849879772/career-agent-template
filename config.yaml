@@ -1772,6 +1772,10 @@ companies:
 - name: "康龙化成"
   careers_url: "https://app.mokahr.com/m/campus_apply/pharmaron/45318?recommendCode=DSFv5WjR#/jobs"
   crawler: moka
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "VeSync"
+  careers_url: "https://app.mokahr.com/campus_apply/vesync/182301?recommendCode=DSJDjhnd#/jobs"
+  crawler: moka
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
