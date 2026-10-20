@@ -1780,6 +1780,10 @@ companies:
 - name: "格蓝若"
   careers_url: "https://oetsky.zhiye.com/campus/jobs?shareId=0661f472-750c-44ff-9387-9d56a6027b3e&shareSource=2"
   crawler: beisen
+# 腾讯文档 27届秋招自动验证通过（真实抓到正式校招岗位后写入）
+- name: "顺丰集团"
+  careers_url: "https://campus.sf-express.com/#/positionList"
+  crawler: render
 deepseek:
   screening_model: deepseek-v4-flash
   analysis_model: deepseek-v4-pro
